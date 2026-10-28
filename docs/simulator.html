@@ -1,0 +1,1762 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Satranç Robotu · ROS 2 Canlı Sunum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Yerleşim: solda 3B sahne + hamle çubuğu, sağda parametre paneli; altta mühendislik kartları (yan görünüş, tork, tutucu, güç, Pi 5). */
+:root {
+  --bg: #e9edf0;
+  --surface: #ffffff;
+  --surface-2: #f3f6f8;
+  --ink: #18222c;
+  --muted: #5a6876;
+  --line: #d3dbe2;
+  --accent: #d9661a;
+  --accent-soft: #f7e3d4;
+  --ok: #2c8448;
+  --warn: #b98100;
+  --bad: #c3352a;
+  --stage: #dde3e8;
+  --table: #cfd6dc;
+  --sq-light: #ead9bb;
+  --sq-dark: #8c6747;
+  --frame: #5b4330;
+  --zone: #b4c2cc;
+  --zone-res: #e8c8a8;
+  --arm: #3b4753;
+  --link: #9aa7b2;
+  --piece-w: #f4efe5;
+  --piece-b: #2a2e33;
+  --prec: #6f52c9;
+  --coll: #12808f;
+  --f-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10161b; --surface: #172029; --surface-2: #1c2731; --ink: #e2e8ed; --muted: #94a2af; --line: #2a3742;
+    --accent: #f08a3a; --accent-soft: #3a2a1f; --ok: #4cb36c; --warn: #e0ac2c; --bad: #ef6457;
+    --stage: #0c1115; --table: #1b232a; --sq-light: #cdb994; --sq-dark: #6a4c34; --frame: #3e2c20;
+    --zone: #3a4955; --zone-res: #6d4f37; --arm: #a5b4c1; --link: #66737f; --piece-w: #ece5d6; --piece-b: #33383e; --prec: #a58cf2; --coll: #3cc0cf;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10161b; --surface: #172029; --surface-2: #1c2731; --ink: #e2e8ed; --muted: #94a2af; --line: #2a3742;
+  --accent: #f08a3a; --accent-soft: #3a2a1f; --ok: #4cb36c; --warn: #e0ac2c; --bad: #ef6457;
+  --stage: #0c1115; --table: #1b232a; --sq-light: #cdb994; --sq-dark: #6a4c34; --frame: #3e2c20;
+  --zone: #3a4955; --zone-res: #6d4f37; --arm: #a5b4c1; --link: #66737f; --piece-w: #ece5d6; --piece-b: #33383e; --prec: #a58cf2; --coll: #3cc0cf;
+  color-scheme: dark;
+}
+:root[data-style="pink"] { --accent: #d23c82; --accent-soft: #fbe1ee; }
+@media (prefers-color-scheme: dark) { :root[data-style="pink"]:not([data-theme="light"]) { --accent: #f272ad; --accent-soft: #3c2131; } }
+:root[data-style="pink"][data-theme="dark"] { --accent: #f272ad; --accent-soft: #3c2131; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 56px; display: grid; gap: 18px; }
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 24px; border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
+header.top h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(28px, 4vw, 42px); line-height: 1; margin: 0; letter-spacing: .01em; text-transform: uppercase; text-wrap: balance; }
+header.top h1 span { color: var(--accent); }
+.spec-line { font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.spec-line b { color: var(--ink); font-weight: 500; }
+.hdr-right { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+a.alt { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; border: 1px solid var(--accent); border-radius: 6px; padding: 5px 10px; white-space: nowrap; }
+a.alt:hover { background: var(--accent-soft); }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { display: grid; gap: 10px; min-width: 0; }
+.viewport { position: relative; height: min(66vh, 640px); min-height: 380px; border-radius: 10px; overflow: hidden; background: var(--stage); border: 1px solid var(--line); touch-action: none; }
+.viewport canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.viewport canvas:active { cursor: grabbing; }
+.ov { position: absolute; font-family: var(--f-mono); font-size: 12px; pointer-events: none; }
+.ov-status { top: 10px; left: 10px; right: 250px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
+.chip.act { border-color: var(--accent); color: var(--accent); }
+.chip.err { border-color: var(--bad); color: var(--bad); white-space: normal; }
+.ov-joints { left: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; max-width: calc(100% - 20px); }
+.ov-joints .chip { font-variant-numeric: tabular-nums; }
+.ov-joints .chip.lim { border-color: var(--bad); color: var(--bad); }
+.ov-hint { right: 10px; top: 10px; color: var(--muted); text-align: right; }
+@media (max-width: 900px) { .ov-hint { display: none; } }
+
+.movebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.movebar input[type=text] { font-family: var(--f-mono); font-size: 15px; width: 120px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--ink); }
+button { font-family: var(--f-body); font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.movebar .sp { flex: 1 1 0; }
+.movebar .time { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.history { font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; min-height: 18px; }
+.history b { color: var(--ink); font-weight: 500; }
+
+aside.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 12px; max-height: calc(min(66vh, 640px) + 110px); overflow: auto; min-width: 0; }
+@media (max-width: 1000px) { aside.panel { max-height: none; } }
+.seg { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
+.seg .lbl { font-size: 12px; color: var(--muted); }
+.seg .btns { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg .btns button { border: 0; border-radius: 0; padding: 5px 10px; background: transparent; }
+.seg .btns button[aria-pressed=true] { background: var(--ink); color: var(--surface); }
+fieldset.grp { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 10px 0 0; display: grid; gap: 8px; }
+fieldset.grp legend { font-family: var(--f-display); font-weight: 600; font-size: 15px; text-transform: uppercase; letter-spacing: .06em; padding: 0 6px 0 0; color: var(--ink); }
+.prm { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; align-items: baseline; }
+.prm label { font-size: 12.5px; color: var(--muted); }
+.prm output { font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.prm input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+
+.cards { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.card h2 { font-family: var(--f-display); font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: .04em; margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.card h2 small { font-family: var(--f-mono); font-weight: 400; font-size: 11.5px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.c-side { grid-column: span 5; } .c-torque { grid-column: span 7; }
+.c-dims, .c-grip, .c-power { grid-column: span 4; }
+.c-pi { grid-column: span 12; }
+@media (max-width: 1100px) { .c-side, .c-torque { grid-column: span 12; } .c-dims, .c-grip, .c-power { grid-column: span 6; } }
+@media (max-width: 700px) { .c-dims, .c-grip, .c-power { grid-column: span 12; } }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 72ch; }
+#side { width: 100%; height: 320px; display: block; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.num small, .kv small { display: block; color: var(--muted); font-size: 11px; }
+td select { font-family: var(--f-body); font-size: 12.5px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); color: var(--ink); max-width: 150px; }
+.bar { width: 110px; height: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.pill { display: inline-block; font-family: var(--f-mono); font-size: 11.5px; padding: 1px 7px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.advice { font-size: 12.5px; padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); color: var(--ink); }
+.pi-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; }
+@media (max-width: 900px) { .pi-grid { grid-template-columns: minmax(0, 1fr); } }
+pre { font-family: var(--f-mono); font-size: 12px; line-height: 1.55; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; margin: 0; }
+.codehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+ul.rules { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.custom { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; font-size: 12px; color: var(--muted); }
+.custom b { color: var(--ink); font-size: 12.5px; width: 100%; }
+.custom label { display: grid; gap: 2px; }
+.custom input { width: 92px; font-family: var(--f-mono); font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); color: var(--ink); }
+.c-prec { grid-column: span 5; } .c-sense { grid-column: span 7; }
+@media (max-width: 1100px) { .c-prec, .c-sense { grid-column: span 12; } }
+.sense-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+@media (max-width: 700px) { .sense-grid { grid-template-columns: minmax(0, 1fr); } }
+.sense-grid h3 { font-size: 13px; margin: 0 0 4px; }
+.sense-grid p { margin: 0; font-size: 12.5px; color: var(--muted); }
+button:disabled, input:disabled, select:disabled { opacity:0.5; cursor:not-allowed; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<nav style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 0;font-size:13px">
+<strong>ROS 2 + GAZEBO</strong><span style="flex:1"></span>
+<a href="#sistem">Sistem nasıl çalışır?</a>
+<a href="https://github.com/mervetzll/satranc-robot" target="_blank" rel="noopener">Kaynak kod</a>
+<a href="rehber.pdf" target="_blank" rel="noopener">Teknik rehber</a>
+<a href="http://localhost:8080/" target="_blank" rel="noopener">Bu bilgisayardaki ROS</a>
+</nav>
+  <header class="top">
+    <h1>Satranç Robotu <span>Simülatörü</span></h1>
+    <div class="hdr-right"><div class="spec-line" id="specLine"></div><div class="seg"><span class="lbl">Tasarım</span><div class="btns" id="styleSeg"><button data-v="alu" aria-pressed="true">Alüminyum</button><button data-v="pink" aria-pressed="false">Pembe</button></div></div></div>
+  </header>
+
+  <div class="main">
+    <section class="stage">
+      <div class="viewport" id="vp">
+        <div class="ov ov-status"><span class="chip" id="stChip">Hazır</span><span class="chip" id="hoverChip" hidden></span></div>
+        <div class="ov ov-joints" id="jointChips"></div>
+        <div class="ov ov-hint">Sürükle: döndür · Tekerlek: yakınlaş<br>Kareye tıkla: kaynak, sonra hedef</div>
+      </div>
+      <div class="movebar">
+        <label for="moveInput" class="note" style="margin:0">Hamle</label>
+        <input type="text" id="moveInput" value="e2e4" autocomplete="off" spellcheck="false">
+        <button class="primary" id="btnPlay">Oynat</button>
+        <button id="btnDemo">Gösterim</button>
+        <button id="btnHome">Eve dön</button>
+        <button id="btnReset">Taşları dağıt</button>
+        <span class="sp"></span>
+        <span class="time" id="timeEst"></span>
+      </div>
+      <div class="history" id="history"><span>Beyazla sen oyna: hamleyi yaz (<b>e2e4</b>) ya da önce taşa, sonra hedef kareye tıkla. Siyahı robot oynar. Yeme, rok (<b>e1g1</b>), geçerken alma ve terfi (<b>e7e8q</b>) desteklenir.</span></div>
+      <div class="legend" aria-label="Kare renkleri"><span><i style="background:var(--bad)"></i>Ulaşılamıyor</span><span><i style="background:var(--coll)"></i>Çarpışma riski</span><span><i style="background:var(--warn)"></i>Servo açı sınırı aşılıyor</span><span><i style="background:var(--prec)"></i>Servo hassasiyeti yetmiyor</span></div>
+    </section>
+
+    <aside class="panel" id="params">
+      <div class="seg"><span class="lbl">Eksen sayısı</span><div class="btns" id="axesSeg"><button data-v="4" aria-pressed="false">4 eksen</button><button data-v="5" aria-pressed="true">5 eksen</button></div></div>
+      <div class="seg"><span class="lbl">Servo besleme gerilimi</span><div class="btns" id="voltSeg"><button data-v="5" aria-pressed="false">5 V</button><button data-v="6" aria-pressed="true">6 V</button></div></div>
+      <div class="seg"><span class="lbl">Bölme düzeni</span><div class="btns" id="zoneSeg"><button data-v="3x4" aria-pressed="false">3×4</button><button data-v="3x5" aria-pressed="false">3×5</button><button data-v="4x4" aria-pressed="true">4×4</button></div></div>
+      <div class="seg"><span class="lbl">Satranç kuralları</span><div class="btns" id="rulesSeg"><button data-v="1" aria-pressed="true">Açık</button><button data-v="0" aria-pressed="false">Kapalı</button></div></div>
+      <div class="seg"><span class="lbl">Siyahı oynayan</span><div class="btns" id="engSeg"><button data-v="1" aria-pressed="true">Robot</button><button data-v="0" aria-pressed="false">Sen</button></div></div>
+      <div class="seg"><span class="lbl">Servo sürme</span><div class="btns" id="driveSeg"><button data-v="gpio" aria-pressed="true">GPIO</button><button data-v="pca" aria-pressed="false">PCA9685</button></div></div>
+    </aside>
+  </div>
+
+  <div class="cards">
+    <section class="card c-side">
+      <h2>Yan görünüş <small id="sideSub">kol düzlemi, ölçüler cm</small></h2>
+      <canvas id="side"></canvas>
+      <p class="note">Turuncu ok uzunlukları kütleyle orantılı yerçekimi yükleri. Kesikli yay, omuzdan erişilebilen en uzak bilek noktası (L2+L3). Gri dikdörtgenler kolun bu yönde üstünden geçtiği taşlar, sarı kesikli çizgi çarpışma sınırı.</p>
+    </section>
+
+    <section class="card c-torque">
+      <h2>Eklem torkları <small>gerekli = (statik + I·α) × emniyet</small></h2>
+      <div class="tbl-wrap"><table id="tq"><thead><tr><th>Eklem</th><th>Servo</th><th>Anlık</th><th>Son hamle tepe</th><th>En kötü durum</th><th>Kapasite</th><th>Kullanım</th></tr></thead><tbody></tbody></table></div>
+      <div class="advice" id="tqAdvice"></div>
+      <div class="custom" id="customServo"><b>Kendi servon: değerleri gir, sonra tabloda "Özel servo"yu seç</b>
+        <label for="cs-tq5">Tork, 5 V (kg·cm)<input type="number" id="cs-tq5" min="0.5" max="150" step="0.5" value="19"></label>
+        <label for="cs-tq6">Tork, 6 V (kg·cm)<input type="number" id="cs-tq6" min="0.5" max="150" step="0.5" value="21"></label>
+        <label for="cs-mass">Kütle (g)<input type="number" id="cs-mass" min="1" max="500" step="1" value="60"></label>
+        <label for="cs-stall">Durma akımı (A)<input type="number" id="cs-stall" min="0.1" max="10" step="0.1" value="2.5"></label>
+        <label for="cs-spd">Hız, 6 V (s/60°)<input type="number" id="cs-spd" min="0.03" max="1" step="0.01" value="0.14"></label>
+      </div>
+      <p class="note">Servo değerleri tipik katalog değerleridir (durma torku). Satın almadan önce kendi modelinin veri sayfasıyla karşılaştır. Sürekli çalışmada durma torkunun en fazla %60–70’ini kullanmak servoyu ısınmaktan ve titremekten korur.</p>
+    </section>
+
+    <section class="card c-dims">
+      <h2>Ölçüler</h2>
+      <dl class="kv" id="dims"></dl>
+    </section>
+
+    <section class="card c-grip">
+      <h2>Tutucu</h2>
+      <dl class="kv" id="grip"></dl>
+      <p class="note">Paralel çeneli, dişli tahrikli tutucu varsayıldı. Parmak kuvveti = servo torku ÷ parmak kaldıraç kolu.</p>
+    </section>
+
+    <section class="card c-power">
+      <h2>Güç bütçesi</h2>
+      <dl class="kv" id="power"></dl>
+      <div class="advice" id="powerAdvice"></div>
+    </section>
+
+    <section class="card c-prec">
+      <h2>Hassasiyet <small>servo hatasının parmak ucuna etkisi</small></h2>
+      <dl class="kv" id="prec"></dl>
+      <div class="advice" id="precAdvice"></div>
+    </section>
+
+    <section class="card c-sense">
+      <h2>Tahtayı algılama ve hamle seçimi <small>gerçek robot için</small></h2>
+      <div class="sense-grid">
+        <div><h3>Hall sensör matrisi (önerilen)</h3><p>Her karenin altına bir Hall sensörü (DRV5032 ya da A3144), her taşın tabanına küçük bir mıknatıs. 64 sensör, 8 adet 74HC165 kaydırmalı yazmaçla yalnızca 3 GPIO pininden okunur. Hangi karede taş olduğunu kesin bilir; taşın türünü başlangıç dizilişinden ve kurallardan çıkarır.</p></div>
+        <div><h3>Kamera</h3><p>Tahtanın üstüne Raspberry Pi Camera Module 3 ve OpenCV. Hamleden önce ve sonra çekilen görüntüler kare kare karşılaştırılır. Kablolama azdır ama ışık değişimine ve gölgeye duyarlıdır.</p></div>
+        <div><h3>"Hamlemi yaptım" düğmesi</h3><p>Rakip hamlesini bitirince satranç saatindeki gibi bir düğmeye basar. Robot tahtayı o an okur, yarım kalmış bir hamleyi yanlış algılamaz.</p></div>
+        <div><h3>Hamle seçimi: Stockfish</h3><p>Simülasyondaki robot rakip kısa bir arama yapar. Gerçek robotta Pi 5 üzerinde Stockfish ve python-chess kullan; hem çok daha güçlüdür hem de yeme, rok ve geçerken almayı senin yerine tanır.</p></div>
+      </div>
+      <pre id="engineCode"># Kurulum: sudo apt install stockfish   ve   pip install chess
+import chess, chess.engine
+
+tahta = chess.Board()
+motor = chess.engine.SimpleEngine.popen_uci("/usr/games/stockfish")
+
+def rakip_oynadi(uci):            # sensörden gelen hamle, örn. "e2e4"
+    tahta.push_uci(uci)
+
+def robot_hamlesi():
+    hamle = motor.play(tahta, chess.engine.Limit(time=0.5)).move
+    yenen = tahta.piece_at(hamle.to_square)        # bölmeye gidecek taş
+    gecerken = tahta.is_en_passant(hamle)          # yenen piyon başka karede
+    rok = tahta.is_castling(hamle)                 # kale de taşınacak
+    tahta.push(hamle)
+    return hamle.uci(), yenen, gecerken, rok</pre>
+    </section>
+
+    <section class="card c-pi">
+      <h2>Raspberry Pi 5 bağlantısı <small id="piSub">sürücü kartı yok, servolar doğrudan GPIO’dan</small></h2>
+      <div class="pi-grid">
+        <div style="display:grid;gap:10px;min-width:0">
+          <div class="tbl-wrap"><table id="pins"><thead><tr><th>Eklem</th><th>GPIO</th><th>Fiziksel pin</th><th>PWM</th></tr></thead><tbody></tbody></table></div>
+          <ul class="rules" id="piRules">
+            <li>Servoları <b>Pi’nin 5V pinine bağlama.</b> Ayrı bir 5–6 V güç kaynağı kullan, eksi ucunu Pi’nin GND pinine (örn. pin 6) bağla.</li>
+            <li>Pi 5 GPIO sinyali 3,3 V. MG996R ve DS32xx servoların çoğu bununla çalışır. Titreme olursa 74AHCT125 gibi bir seviye dönüştürücü ekle.</li>
+            <li>GPIO 12, 13, 18 ve 19 donanım PWM destekler; en yüklü eklemler (omuz, dirsek) bu pinlerde. Diğerleri yazılım PWM ile sürülür, hafif titreme yapabilir.</li>
+            <li>Her büyük servonun besleme girişine 470–1000 µF kondansatör koy; ani akım çekişinde Pi’nin resetlenmesini önler.</li>
+          </ul>
+        </div>
+        <div style="display:grid;gap:8px;min-width:0">
+          <div class="codehead"><span class="note" id="codeNote">Python (gpiozero, Pi 5’te varsayılan lgpio altyapısı). Açılar robotun şu anki duruşu.</span><button id="btnCopy">Kopyala</button></div>
+          <pre id="code"></pre>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+let rosMode = false;
+let STYLE = 'alu'; // 'alu' = alüminyum plakalı kol, 'pink' = pembe endüstriyel kol
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const G = 9.80665, KGCM = 0.0980665; // 1 kg·cm = 0.0980665 N·m
+
+// Tipik katalog değerleri: tq = durma torku kg·cm (5V/6V), mass g, stall A, spd s/60°
+const SERVOS = {
+  SG90:   { name: 'SG90',           tq: { 5: 1.8, 6: 2.0 },  mass: 9,    stall: 0.65, spd: { 5: 0.10, 6: 0.09 } },
+  MG90S:  { name: 'MG90S',          tq: { 5: 1.9, 6: 2.2 },  mass: 13.4, stall: 0.7,  spd: { 5: 0.10, 6: 0.08 } },
+  MG996R: { name: 'MG996R',         tq: { 5: 9.6, 6: 11 },   mass: 55,   stall: 2.5,  spd: { 5: 0.17, 6: 0.14 } },
+  DS3218: { name: 'DS3218 (20 kg)', tq: { 5: 19, 6: 20.5 },  mass: 60,   stall: 2.6,  spd: { 5: 0.16, 6: 0.14 } },
+  DS3225: { name: 'DS3225 (25 kg)', tq: { 5: 21.5, 6: 23.5 },mass: 60,   stall: 3.0,  spd: { 5: 0.15, 6: 0.13 } },
+  DS3235: { name: 'DS3235 (35 kg)', tq: { 5: 28, 6: 32 },    mass: 68,   stall: 3.5,  spd: { 5: 0.17, 6: 0.15 } },
+  CUSTOM: { name: 'Özel servo',     tq: { 5: 19, 6: 21 },    mass: 60,   stall: 2.5,  spd: { 5: 0.16, 6: 0.14 } },
+};
+const JOINTS = [
+  { k: 'J1', name: 'J1 · Taban dönüşü', gpio: 12, pin: 32, pwm: 'Donanım (PWM0 k0)' },
+  { k: 'J2', name: 'J2 · Omuz',          gpio: 13, pin: 33, pwm: 'Donanım (PWM0 k1)' },
+  { k: 'J3', name: 'J3 · Dirsek',        gpio: 18, pin: 12, pwm: 'Donanım (PWM0 k2)' },
+  { k: 'J4', name: 'J4 · Bilek eğimi',   gpio: 19, pin: 35, pwm: 'Donanım (PWM0 k3)' },
+  { k: 'J5', name: 'J5 · Bilek dönüşü',  gpio: 23, pin: 16, pwm: 'Yazılım' },
+  { k: 'G',  name: 'Tutucu',             gpio: 24, pin: 18, pwm: 'Yazılım' },
+];
+const SV = { J1: 'MG996R', J2: 'DS3235', J3: 'DS3218', J4: 'MG996R', J5: 'MG90S', G: 'MG90S' };
+
+const SPEC = [
+  { g: 'Tahta ve bölmeler', items: [
+    ['s', 'Kare kenarı', 3, 7, 0.5, 5, 'cm'],
+    ['zGap', 'Bölme ile tahta arası boşluk', 0, 6, 0.5, 1, 'cm'],
+    ['baseGap', 'Taban merkezi → tahta kenarı', 3, 20, 0.5, 9.5, 'cm'],
+  ]},
+  { g: 'Kol uzunlukları', items: [
+    ['L1', 'L1 · omuz yüksekliği', 4, 30, 0.5, 10, 'cm'],
+    ['L2', 'L2 · üst kol (omuz → dirsek)', 10, 45, 0.5, 24, 'cm'],
+    ['L3', 'L3 · ön kol (dirsek → bilek)', 10, 45, 0.5, 30, 'cm'],
+    ['L4', 'L4 · bilek → parmak ucu', 5, 20, 0.5, 14, 'cm'],
+  ]},
+  { g: 'Kütleler', items: [
+    ['linkMass', 'Kol malzemesi (birim boy)', 0.5, 8, 0.1, 2.5, 'g/cm'],
+    ['gripMass', 'Tutucu gövdesi (servosuz)', 10, 150, 5, 35, 'g'],
+    ['pieceMass', 'En ağır taş', 5, 100, 1, 40, 'g'],
+  ]},
+  { g: 'Hareket', items: [
+    ['alpha', 'Açısal ivme', 0, 12, 0.5, 4, 'rad/s²'],
+    ['SF', 'Emniyet katsayısı', 1, 3, 0.1, 1.5, '×'],
+    ['clear', 'Taşırken taşların üstünden pay', 1, 8, 0.5, 3, 'cm'],
+    ['graspFrac', 'Kavrama yüksekliği', 20, 80, 1, 45, '% taş boyu'],
+    ['tilt', 'Tutucu eğimi (dikeyden)', 0, 30, 1, 20, '°'],
+    ['speed', 'Simülasyon hızı', 4, 40, 1, 14, 'cm/s'],
+  ]},
+  { g: 'Gerçekçilik payları', items: [
+    ['acc', 'Servo konum hatası (±)', 0.1, 3, 0.1, 0.5, '°'],
+    ['fric', 'Dişli ve sürtünme kaybı', 0, 40, 1, 15, '%'],
+    ['cableMass', 'Kablo kütlesi (birim boy)', 0, 3, 0.1, 0.6, 'g/cm'],
+  ]},
+  { g: 'Tutucu', items: [
+    ['fingerR', 'Parmak kaldıraç kolu', 1, 5, 0.1, 2.5, 'cm'],
+    ['mu', 'Sürtünme katsayısı μ', 0.2, 1, 0.05, 0.5, ''],
+    ['fingerT', 'Parmak kalınlığı', 0.3, 1.5, 0.1, 0.6, 'cm'],
+    ['openClear', 'Açılma payı (her yan)', 0.1, 1, 0.05, 0.35, 'cm'],
+  ]},
+];
+const P = { axes: 5, V: 6, zl: '4x4', rules: 1, engine: 1, drive: 'gpio' };
+const BASE_R = 8.5;  // taban plakasının yarıçapı (cm), iki tasarımda da
+const FRAME_W = 0.8; // tahta çerçevesinin kare kenarından taşan payı (cm)
+const baseClear = () => P.baseGap - FRAME_W - BASE_R; // eksi = taban tahtaya biniyor
+SPEC.forEach(g => g.items.forEach(it => P[it[0]] = it[5]));
+
+// Staunton oranları: h = boy / kare, d = taban çapı / kare
+const PT = { K: { h: 1.75, d: 0.78 }, Q: { h: 1.55, d: 0.76 }, B: { h: 1.30, d: 0.70 }, N: { h: 1.20, d: 0.70 }, R: { h: 1.05, d: 0.70 }, P: { h: 0.95, d: 0.60 } };
+const NAME = { K: 'Şah', Q: 'Vezir', R: 'Kale', B: 'Fil', N: 'At', P: 'Piyon' };
+const pieceH = t => PT[t].h * P.s;
+const graspZ = t => pieceH(t) * P.graspFrac / 100;
+const graspD = t => PT[t].d * P.s * 0.62;
+const travelZ = () => pieceH('K') + P.clear + graspZ('K');
+const half = () => 4 * P.s;
+const basePos = () => ({ x: 0, y: half() + P.baseGap });
+const FILES = 'abcdefgh';
+const sqCenter = (f, r) => ({ x: -half() + P.s * (f + 0.5), y: -half() + P.s * (r + 0.5) });
+const ZONES = { '3x4': [3, 4], '3x5': [3, 5], '4x4': [4, 4] };
+const zc = () => ZONES[P.zl][0], zr = () => ZONES[P.zl][1], nSlots = () => zc() * zr();
+const zoneCenter = (side, idx) => {
+  const col = idx % zc(), row = Math.floor(idx / zc());
+  const x = (half() + P.zGap + P.s * (col + 0.5)) * (side === 'w' ? -1 : 1);
+  return { x, y: half() - P.s * (row + 0.5) };
+};
+// Ev duruşu: dirsek omzun üstünde kalacak kadar ileride (yakın bir noktada uzun ön kol dirseği geriye katlar)
+const homeTip = () => { const B = basePos(); return { x: 0, y: B.y - 32, z: travelZ() + 2 }; };
+
+// ---------- Kinematik ----------
+const normA = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a <= -Math.PI) a += 2 * Math.PI; return a; };
+function ik(tx, ty, tz) {
+  const B = basePos(), dx = tx - B.x, dy = ty - B.y;
+  const th1 = Math.atan2(dx, -dy), r = Math.hypot(dx, dy);
+  const ph4 = -Math.PI / 2 + P.tilt * D2R; // eğik tutucu: uç, bilekten dışarıda kalır
+  const wr = r - P.L4 * Math.cos(ph4), dz = tz - P.L4 * Math.sin(ph4) - P.L1;
+  const D = Math.hypot(wr, dz), Lmax = P.L2 + P.L3, Lmin = Math.abs(P.L2 - P.L3);
+  let reach = true, Dc = D;
+  if (D > Lmax) { reach = false; Dc = Lmax - 1e-6; }
+  if (D < Lmin + 1e-3) { reach = false; Dc = Lmin + 1e-3; }
+  const a = Math.atan2(dz, wr);
+  const b = Math.acos(clamp((P.L2 * P.L2 + Dc * Dc - P.L3 * P.L3) / (2 * P.L2 * Dc), -1, 1));
+  const th2 = a + b;
+  const ex = P.L2 * Math.cos(th2), ez = P.L2 * Math.sin(th2);
+  const ph3 = Math.atan2(Dc * Math.sin(a) - ez, Dc * Math.cos(a) - ex);
+  let psi = 0;
+  if (P.axes === 5) { // çeneyi tahtanın köşegenine hizala: komşu taşlara en geniş boşluk
+    psi = th1 - Math.PI / 4;
+    while (psi > Math.PI / 4) psi -= Math.PI / 2;
+    while (psi < -Math.PI / 4) psi += Math.PI / 2;
+  }
+  const q3 = normA(ph3 - th2), q4 = normA(ph4 - ph3);
+  const s = [90 + th1 * R2D, th2 * R2D, -q3 * R2D, 180 + q4 * R2D, 90 + psi * R2D];
+  const lim = s.map((v, i) => (i === 4 && P.axes === 4) ? false : (v < -0.5 || v > 180.5));
+  return { th1, th2, ph3, ph4, psi, s, lim, reach, D, r };
+}
+function fkPlane(sol) {
+  const S = [0, P.L1];
+  const E = [S[0] + P.L2 * Math.cos(sol.th2), S[1] + P.L2 * Math.sin(sol.th2)];
+  const W = [E[0] + P.L3 * Math.cos(sol.ph3), E[1] + P.L3 * Math.sin(sol.ph3)];
+  const T = [W[0] + P.L4 * Math.cos(sol.ph4), W[1] + P.L4 * Math.sin(sol.ph4)];
+  return { S, E, W, T };
+}
+function toWorld(sol, pt) {
+  const B = basePos();
+  return { x: B.x + Math.sin(sol.th1) * pt[0], y: B.y - Math.cos(sol.th1) * pt[0], z: pt[1] };
+}
+
+// ---------- Yük / tork ----------
+function loads(sol, payloadKg) {
+  const f = fkPlane(sol), lm = (P.linkMass + P.cableMass) / 1000, sv = k => SERVOS[SV[k]];
+  const mid = (a, b, t = 0.5) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const items = [
+    { m: lm * P.L2, p: mid(f.S, f.E), lvl: 2, rod: P.L2, lab: 'üst kol' },
+    { m: sv('J3').mass / 1000, p: f.E, lvl: 3, lab: 'dirsek servo' },
+    { m: lm * P.L3, p: mid(f.E, f.W), lvl: 3, rod: P.L3, lab: 'ön kol' },
+    { m: sv('J4').mass / 1000, p: f.W, lvl: 4, lab: 'bilek servo' },
+  ];
+  if (P.axes === 5) items.push({ m: sv('J5').mass / 1000, p: mid(f.W, f.T, 0.15), lvl: 4, lab: 'dönüş servo' });
+  items.push({ m: (P.gripMass + sv('G').mass) / 1000, p: mid(f.W, f.T, 0.45), lvl: 4, lab: 'tutucu' });
+  if (payloadKg > 0) items.push({ m: payloadKg, p: f.T, lvl: 4, lab: 'taş', pay: true });
+  const J = [null, null, f.S, f.E, f.W];
+  const st = [0, 0, 0, 0, 0], I = [0, 0, 0, 0, 0];
+  let M0 = 0; // taban eksenine göre devirme momenti, kg·cm
+  for (const it of items) {
+    I[0] += it.m * it.p[0] * it.p[0];
+    M0 += it.m * Math.abs(it.p[0]);
+    for (let k = 2; k <= 4; k++) if (it.lvl >= k) {
+      const dr = it.p[0] - J[k][0], dz = it.p[1] - J[k][1];
+      st[k - 1] += it.m * dr;
+      I[k - 1] += it.m * (dr * dr + dz * dz) + (it.rod ? it.m * it.rod * it.rod / 12 : 0);
+    }
+  }
+  if (P.axes === 5) I[4] = ((P.gripMass + sv('G').mass) / 1000 + payloadKg) * 1.5 * 1.5;
+  const stA = st.map(Math.abs);
+  const dy = I.map(v => v / 1e4 * P.alpha / KGCM);
+  const req = stA.map((v, i) => (v + dy[i]) * P.SF * (1 + P.fric / 100));
+  return { st: stA, dy, req, items, f, M0 };
+}
+function gripCalc() {
+  const s = SERVOS[SV.G], tq = s.tq[P.V];
+  const F = tq / P.fingerR * G;
+  const Freq = P.pieceMass / 1000 * G * P.SF / (2 * P.mu);
+  const tqReq = Freq / G * P.fingerR * (1 + P.fric / 100);
+  return { F, Freq, tqReq, tq };
+}
+// Parmakların komşu taşa kalan boşluğu (cm)
+function gapCalc() {
+  const s = P.s, dK = graspD('K'), rN = dK / 2, outer = dK / 2 + P.openClear + P.fingerT;
+  const mAx = s - rN - outer, mDg = s * Math.SQRT2 - rN - outer;
+  return { dK, mAx, mDg, use: P.axes === 5 ? mDg : mAx };
+}
+// İzin verilen uç sapması (mm): parmak boşluğu ya da şahın karede kalması, hangisi küçükse
+const tolMM = () => Math.max(0, Math.min(gapCalc().use, (P.s - PT.K.d * P.s) / 2)) * 10;
+// Servo konum hatasının uçta yaptığı sapma (mm)
+function tipErr(sol) {
+  const f = fkPlane(sol), d = P.acc * D2R, T = f.T;
+  const levers = [Math.abs(T[0]), Math.hypot(T[0] - f.S[0], T[1] - f.S[1]), Math.hypot(T[0] - f.E[0], T[1] - f.E[1]), P.L4];
+  return {
+    wc: levers.reduce((a, b) => a + b, 0) * d * 10,
+    rss: Math.sqrt(levers.reduce((a, b) => a + b * b, 0)) * d * 10,
+  };
+}
+// Üst kol, ön kol ya da bilek tahtadaki taşlara veya zemine çarpıyor mu
+function collide(sol) {
+  const f = fkPlane(sol), h = half(), zObs = pieceH('K') + 1.5, zx = h + P.zGap + zc() * P.s;
+  const inFoot = p => (Math.abs(p.x) <= h && Math.abs(p.y) <= h)
+    || (Math.abs(p.x) >= h + P.zGap && Math.abs(p.x) <= zx && p.y <= h && p.y >= h - zr() * P.s);
+  for (const [a, b] of [[f.S, f.E], [f.E, f.W]]) for (let i = 0; i <= 8; i++) {
+    const t = i / 8, w = toWorld(sol, [lerp(a[0], b[0], t), lerp(a[1], b[1], t)]);
+    if (w.z < 0.5 || (w.z < zObs && inFoot(w))) return true;
+  }
+  return false;
+}
+
+// ---------- En kötü durum taraması ----------
+let WORST = null;
+function scan() {
+  const targets = [];
+  for (let f = 0; f < 8; f++) for (let r = 0; r < 8; r++) { const c = sqCenter(f, r); targets.push({ lab: FILES[f] + (r + 1), key: FILES[f] + (r + 1), ...c }); }
+  for (const side of ['w', 'b']) for (let i = 0; i < nSlots(); i++) { const c = zoneCenter(side, i); targets.push({ lab: (side === 'w' ? 'B' : 'S') + '-bölme ' + (i + 1), key: side + i, ...c }); }
+  const zs = [graspZ('P'), graspZ('K'), travelZ()];
+  const best = [0, 0, 0, 0, 0].map(() => ({ req: 0, st: 0, dy: 0, lab: '—' }));
+  const unreach = new Set(), limits = new Set(), coll = new Set(), err = {};
+  let maxD = { D: 0, lab: '' }, maxR = 0, maxM0 = 0, maxErr = { rss: 0, wc: 0, lab: '—' };
+  for (const t of targets) for (const z of zs) {
+    const sol = ik(t.x, t.y, z);
+    if (!sol.reach) { unreach.add(t.key); continue; }
+    if (sol.lim.some(Boolean)) limits.add(t.key);
+    if (collide(sol)) coll.add(t.key);
+    if (sol.D > maxD.D) maxD = { D: sol.D, lab: t.lab };
+    maxR = Math.max(maxR, sol.r);
+    const L = loads(sol, P.pieceMass / 1000);
+    maxM0 = Math.max(maxM0, L.M0);
+    for (let j = 0; j < 5; j++) if (L.req[j] > best[j].req) best[j] = { req: L.req[j], st: L.st[j], dy: L.dy[j], lab: t.lab };
+    if (z === zs[0]) { const e = tipErr(sol); err[t.key] = e.rss; if (e.rss > maxErr.rss) maxErr = { ...e, lab: t.lab }; }
+  }
+  const g = gripCalc(), tol = tolMM();
+  const precBad = Object.values(err).filter(v => v > tol).length;
+  WORST = { best, unreach, limits, coll, err, maxErr, tol, precBad, maxM0, maxD, maxR, grip: g, n: targets.length };
+}
+
+// ---------- Tahta durumu ----------
+const state = { board: {}, zone: { w: Array(nSlots()).fill(null), b: Array(nSlots()).fill(null) }, pieces: [], tip: null, gap: 3, held: null, sel: null };
+let pid = 0;
+function initPieces() {
+  state.board = {}; state.zone = { w: Array(nSlots()).fill(null), b: Array(nSlots()).fill(null) };
+  state.pieces.forEach(p => p.mesh && scene.remove(p.mesh));
+  state.pieces = [];
+  const back = 'RNBQKBNR';
+  const add = (t, c, loc) => { const p = { id: pid++, t, c, loc: null, mesh: null }; state.pieces.push(p); setLoc(p, loc); };
+  for (let f = 0; f < 8; f++) {
+    add(back[f], 'w', { kind: 'sq', key: FILES[f] + '1' }); add('P', 'w', { kind: 'sq', key: FILES[f] + '2' });
+    add('P', 'b', { kind: 'sq', key: FILES[f] + '7' }); add(back[f], 'b', { kind: 'sq', key: FILES[f] + '8' });
+  }
+  add('Q', 'w', { kind: 'zone', side: 'w', idx: 0 });
+  add('Q', 'b', { kind: 'zone', side: 'b', idx: 0 });
+  state.pieces.forEach(makePieceMesh);
+  history = [];
+  renderHistory();
+}
+function setLoc(p, loc) {
+  if (p.loc) { if (p.loc.kind === 'sq') delete state.board[p.loc.key]; else state.zone[p.loc.side][p.loc.idx] = null; }
+  p.loc = loc;
+  if (loc.kind === 'sq') state.board[loc.key] = p; else state.zone[loc.side][loc.idx] = p;
+}
+function locPoint(loc) {
+  if (loc.kind === 'sq') return sqCenter(FILES.indexOf(loc.key[0]), +loc.key[1] - 1);
+  return zoneCenter(loc.side, loc.idx);
+}
+const locLabel = loc => loc.kind === 'sq' ? loc.key : (loc.side === 'w' ? 'beyaz' : 'siyah') + ' bölme ' + (loc.idx + 1);
+
+// ---------- Satranç kuralları (hafif tahta: kare → { t, c }) ----------
+let game = { turn: 'w', castle: { wK: true, wQ: true, bK: true, bQ: true }, ep: null, over: null };
+function resetGame() { game = { turn: 'w', castle: { wK: true, wQ: true, bK: true, bQ: true }, ep: null, over: null }; }
+const sqk = (f, r) => FILES[f] + (r + 1);
+const fr = k => [FILES.indexOf(k[0]), +k[1] - 1];
+const onB = (f, r) => f >= 0 && f < 8 && r >= 0 && r < 8;
+const KN = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]];
+const ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]], DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+function snapshot() { const B = {}; for (const k in state.board) B[k] = { t: state.board[k].t, c: state.board[k].c }; return B; }
+function attacked(B, k, by) {
+  const [f, r] = fr(k), at = (ff, rr) => onB(ff, rr) ? B[sqk(ff, rr)] : null;
+  const pr = by === 'w' ? r - 1 : r + 1;
+  for (const df of [-1, 1]) { const p = at(f + df, pr); if (p && p.c === by && p.t === 'P') return true; }
+  for (const [a, b] of KN) { const p = at(f + a, r + b); if (p && p.c === by && p.t === 'N') return true; }
+  for (const [a, b] of ORTH.concat(DIAG)) { const p = at(f + a, r + b); if (p && p.c === by && p.t === 'K') return true; }
+  const ray = (dirs, types) => dirs.some(([a, b]) => {
+    for (let i = 1; i < 8; i++) { const p = at(f + a * i, r + b * i); if (!onB(f + a * i, r + b * i)) return false; if (p) return p.c === by && types.includes(p.t); }
+    return false;
+  });
+  return ray(ORTH, 'RQ') || ray(DIAG, 'BQ');
+}
+const kingKey = (B, c) => Object.keys(B).find(k => B[k].t === 'K' && B[k].c === c) || null;
+function pseudo(B, g) {
+  const c = g.turn, opp = c === 'w' ? 'b' : 'w', out = [];
+  const free = (f, r) => onB(f, r) && !B[sqk(f, r)];
+  const enemy = (f, r) => onB(f, r) && B[sqk(f, r)] && B[sqk(f, r)].c === opp;
+  for (const k in B) {
+    const p = B[k]; if (p.c !== c) continue;
+    const [f, r] = fr(k), add = (to, x = {}) => out.push({ from: k, to, ...x });
+    if (p.t === 'P') {
+      const d = c === 'w' ? 1 : -1, last = c === 'w' ? 7 : 0;
+      const push = (to, x) => { if (fr(to)[1] === last) for (const pr of 'QRBN') add(to, { ...x, promo: pr }); else add(to, x); };
+      if (free(f, r + d)) { push(sqk(f, r + d)); if (r === (c === 'w' ? 1 : 6) && free(f, r + 2 * d)) add(sqk(f, r + 2 * d), { dbl: true }); }
+      for (const df of [-1, 1]) {
+        if (enemy(f + df, r + d)) push(sqk(f + df, r + d));
+        else if (onB(f + df, r + d) && g.ep === sqk(f + df, r + d)) add(g.ep, { ep: sqk(f + df, r) });
+      }
+    } else if (p.t === 'N' || p.t === 'K') {
+      for (const [a, b] of p.t === 'N' ? KN : ORTH.concat(DIAG)) if (free(f + a, r + b) || enemy(f + a, r + b)) add(sqk(f + a, r + b));
+      const rr = c === 'w' ? 0 : 7;
+      if (p.t === 'K' && k === sqk(4, rr) && !attacked(B, k, opp)) {
+        const rook = ff => B[sqk(ff, rr)] && B[sqk(ff, rr)].t === 'R' && B[sqk(ff, rr)].c === c;
+        if (g.castle[c + 'K'] && rook(7) && free(5, rr) && free(6, rr) && !attacked(B, sqk(5, rr), opp)) add(sqk(6, rr), { castle: 'K' });
+        if (g.castle[c + 'Q'] && rook(0) && free(3, rr) && free(2, rr) && free(1, rr) && !attacked(B, sqk(3, rr), opp)) add(sqk(2, rr), { castle: 'Q' });
+      }
+    } else {
+      const dirs = p.t === 'R' ? ORTH : p.t === 'B' ? DIAG : ORTH.concat(DIAG);
+      for (const [a, b] of dirs) for (let i = 1; i < 8; i++) {
+        const ff = f + a * i, rr = r + b * i;
+        if (free(ff, rr)) add(sqk(ff, rr)); else { if (enemy(ff, rr)) add(sqk(ff, rr)); break; }
+      }
+    }
+  }
+  return out;
+}
+function applyLite(B, m) {
+  const N = { ...B }, p = N[m.from];
+  delete N[m.from];
+  if (m.ep) delete N[m.ep];
+  N[m.to] = m.promo ? { t: m.promo, c: p.c } : p;
+  if (m.castle) { const rk = m.to[1], [a, b] = m.castle === 'K' ? ['h', 'f'] : ['a', 'd']; N[b + rk] = N[a + rk]; delete N[a + rk]; }
+  return N;
+}
+function nextState(g, B, m) {
+  const p = B[m.from], castle = { ...g.castle };
+  if (p.t === 'K') castle[p.c + 'K'] = castle[p.c + 'Q'] = false;
+  for (const [k, key] of [['a1', 'wQ'], ['h1', 'wK'], ['a8', 'bQ'], ['h8', 'bK']]) if (m.from === k || m.to === k) castle[key] = false;
+  const ep = m.dbl ? m.from[0] + ((+m.from[1] + +m.to[1]) / 2) : null;
+  return { turn: p.c === 'w' ? 'b' : 'w', castle, ep, over: null };
+}
+function legal(B, g) {
+  const opp = g.turn === 'w' ? 'b' : 'w';
+  return pseudo(B, g).filter(m => { const N = applyLite(B, m), kk = kingKey(N, g.turn); return kk && !attacked(N, kk, opp); });
+}
+// Robot rakip: malzeme + merkez/ilerleme bonusu ile alfa-beta arama
+const VAL = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 0 };
+function evalB(B) {
+  let s = 0;
+  for (const k in B) {
+    const p = B[k], [f, r] = fr(k);
+    let v = VAL[p.t];
+    if (p.t !== 'K') v += 12 - 3 * (Math.abs(3.5 - f) + Math.abs(3.5 - r));
+    if (p.t === 'P') v += 6 * (p.c === 'w' ? r : 7 - r);
+    s += p.c === 'w' ? v : -v;
+  }
+  return s;
+}
+function search(B, g, depth, alpha, beta) {
+  const ms = legal(B, g);
+  if (!ms.length) { const kk = kingKey(B, g.turn); return kk && attacked(B, kk, g.turn === 'w' ? 'b' : 'w') ? (g.turn === 'w' ? -1e6 - depth : 1e6 + depth) : 0; }
+  if (depth === 0) return evalB(B);
+  ms.sort((a, b) => (B[b.to] ? VAL[B[b.to].t] : 0) - (B[a.to] ? VAL[B[a.to].t] : 0));
+  let best = g.turn === 'w' ? -Infinity : Infinity;
+  for (const m of ms) {
+    const v = search(applyLite(B, m), nextState(g, B, m), depth - 1, alpha, beta);
+    if (g.turn === 'w') { best = Math.max(best, v); alpha = Math.max(alpha, best); } else { best = Math.min(best, v); beta = Math.min(beta, best); }
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+function bestMove(B, g, depth) {
+  const ms = legal(B, g).filter(m => !m.promo || m.promo === 'Q').sort(() => Math.random() - 0.5);
+  let best = null, bv = g.turn === 'w' ? -Infinity : Infinity;
+  for (const m of ms) {
+    const v = search(applyLite(B, m), nextState(g, B, m), depth - 1, -Infinity, Infinity);
+    if (g.turn === 'w' ? v > bv : v < bv) { bv = v; best = m; }
+  }
+  return best;
+}
+
+// ---------- three.js sahne ----------
+const vp = $('#vp');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+vp.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 2000);
+const V = (x, y, z) => new THREE.Vector3(x, z, -y); // mantıksal (x, y, z-yukarı) → three
+// Metal yüzeyler için basit stüdyo ortamı (yansıma haritası)
+(() => {
+  const es = new THREE.Scene();
+  const geo = new THREE.SphereGeometry(50, 32, 16), pos = geo.attributes.position, cols = [];
+  for (let i = 0; i < pos.count; i++) { const t = clamp(pos.getY(i) / 50 * 0.5 + 0.5, 0, 1), v = 0.4 + 0.55 * t; cols.push(v, v, v * 1.04); }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  es.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true })));
+  [[30, 25, 10], [-28, 18, -20], [0, 40, 0]].forEach(([x, y, z]) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(22, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })); p.position.set(x, y, z); p.lookAt(0, 0, 0); es.add(p); });
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(es, 0.04).texture;
+})();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.4));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+sun.position.set(45, 110, 60); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -80, right: 80, top: 80, bottom: -80, near: 10, far: 400 });
+scene.add(sun);
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
+const col = n => new THREE.Color(css(n));
+const M = {};
+function mat(name, opts = {}) { return new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, metalness: 0.05, ...opts }); }
+M.pw = mat('pw', { roughness: 0.45, envMapIntensity: 0.5 }); M.pb = mat('pb', { roughness: 0.4, envMapIntensity: 0.6 });
+M.arm = mat('arm', { roughness: 0.45, metalness: 0.25 }); M.link = mat('link', { roughness: 0.4, metalness: 0.45 });
+M.servo = mat('servo', { roughness: 0.55 }); M.frame = mat('frame', { envMapIntensity: 0.3 }); M.table = mat('table', { roughness: 0.9, envMapIntensity: 0.25 });
+M.zoneTray = mat('zoneTray', { envMapIntensity: 0.3 }); M.accent = mat('acc', { roughness: 0.5 });
+M.selRing = new THREE.MeshBasicMaterial({ color: 0xff7700, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+M.hovRing = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
+const mesh = (g, m, shadow = true) => { const o = new THREE.Mesh(g, m); o.castShadow = shadow; o.receiveShadow = true; return o; };
+
+let boardGroup = null; const tiles = []; // pick hedefleri
+function labelPlane(text, size, colorHex, w = 1) {
+  const c = document.createElement('canvas'); c.width = 128 * w; c.height = 128;
+  const g = c.getContext('2d'); g.fillStyle = colorHex; g.font = '600 84px "IBM Plex Sans", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, c.width / 2, 68);
+  const tex = new THREE.CanvasTexture(c);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size * w, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  m.rotation.x = -Math.PI / 2; return m;
+}
+function buildBoard() {
+  if (boardGroup) scene.remove(boardGroup);
+  tiles.length = 0;
+  const g = new THREE.Group(); boardGroup = g; scene.add(g);
+  const s = P.s, h = half();
+  const table = mesh(new THREE.PlaneGeometry(3000, 3000), M.table, false); table.rotation.x = -Math.PI / 2; table.position.y = -1.5; g.add(table);
+  const fr = mesh(new THREE.BoxGeometry(8 * s + 1.6, 1.4, 8 * s + 1.6), M.frame); fr.position.y = -0.75; g.add(fr);
+  const light = css('--sq-light'), dark = css('--sq-dark');
+  for (let f = 0; f < 8; f++) for (let r = 0; r < 8; r++) {
+    const m = new THREE.MeshStandardMaterial({ color: (f + r) % 2 === 0 ? dark : light, roughness: 0.7, envMapIntensity: 0.3 });
+    const t = mesh(new THREE.BoxGeometry(s, 0.6, s), m, false);
+    const c = sqCenter(f, r); t.position.copy(V(c.x, c.y, -0.3));
+    t.userData = { kind: 'sq', key: FILES[f] + (r + 1), base: m.color.clone() };
+    g.add(t); tiles.push(t);
+  }
+  for (const side of ['w', 'b']) {
+    const cx = (h + P.zGap + zc() / 2 * s) * (side === 'w' ? -1 : 1), cy = h - zr() / 2 * s;
+    const tray = mesh(new THREE.BoxGeometry(zc() * s + 0.8, 1.2, zr() * s + 0.8), M.zoneTray); tray.position.copy(V(cx, cy, -0.75)); g.add(tray);
+    for (let i = 0; i < nSlots(); i++) {
+      const m = new THREE.MeshStandardMaterial({ color: css(i === 0 ? '--zone-res' : '--zone'), roughness: 0.8, envMapIntensity: 0.3 });
+      const t = mesh(new THREE.BoxGeometry(s * 0.92, 0.5, s * 0.92), m, false);
+      const c = zoneCenter(side, i); t.position.copy(V(c.x, c.y, -0.3));
+      t.userData = { kind: 'zone', side, idx: i, base: m.color.clone() };
+      g.add(t); tiles.push(t);
+    }
+    const lab = labelPlane(side === 'w' ? 'BEYAZ BÖLME' : 'SİYAH BÖLME', 1.6, css('--muted'), 6);
+    lab.position.copy(V(cx, cy - zr() / 2 * s - 1.6, 0.02)); g.add(lab);
+  }
+  const mc = css('--sq-light');
+  for (let f = 0; f < 8; f++) { const l = labelPlane(FILES[f], 0.75, mc); const c = sqCenter(f, 0); l.position.copy(V(c.x, -h - 0.4, 0.0)); g.add(l); }
+  for (let r = 0; r < 8; r++) { const l = labelPlane(String(r + 1), 0.75, mc); const c = sqCenter(7, r); l.position.copy(V(h + 0.4, c.y, 0.0)); g.add(l); }
+  const ringG = new THREE.RingGeometry(s * 0.36, s * 0.47, 48);
+  hovRing = new THREE.Mesh(ringG, M.hovRing); hovRing.rotation.x = -Math.PI / 2; hovRing.visible = false; g.add(hovRing);
+  selRing = new THREE.Mesh(ringG, M.selRing); selRing.rotation.x = -Math.PI / 2; selRing.visible = false; g.add(selRing);
+  tintTiles();
+}
+let hovRing, selRing;
+function tintTiles() {
+  if (!WORST) return;
+  const bad = col('--bad'), warn = col('--warn'), coll = col('--coll'), prec = col('--prec');
+  for (const t of tiles) {
+    const k = t.userData.kind === 'sq' ? t.userData.key : t.userData.side + t.userData.idx;
+    const c = t.userData.base.clone();
+    if (WORST.unreach.has(k)) c.lerp(bad, 0.65);
+    else if (WORST.coll.has(k)) c.lerp(coll, 0.6);
+    else if (WORST.limits.has(k)) c.lerp(warn, 0.5);
+    else if (WORST.err[k] > WORST.tol) c.lerp(prec, 0.55);
+    t.material.color.copy(c);
+  }
+}
+
+// Taş modelleri (torna profili)
+const PROFILES = {
+  P: [[.48,.28],[.36,.5],[.32,.6],[.62,.63],[.62,.67],[.34,.7],[.5,.76],[.56,.84],[.5,.93],[.32,.98],[0,1]],
+  R: [[.66,.3],[.6,.72],[.8,.76],[.8,1],[.58,1],[.58,.92],[0,.92]],
+  B: [[.45,.3],[.33,.6],[.6,.64],[.6,.68],[.3,.7],[.48,.78],[.52,.86],[.38,.95],[.12,.98],[.15,1],[0,1]],
+  Q: [[.5,.3],[.34,.66],[.62,.7],[.62,.74],[.4,.76],[.52,.86],[.7,.95],[.5,.96],[.25,.98],[.2,1],[0,1]],
+  K: [[.5,.3],[.34,.68],[.62,.72],[.62,.76],[.4,.78],[.56,.88],[.62,.9],[.3,.92],[0,.92]],
+  N: [[.6,.3],[.55,.45],[0,.45]],
+};
+const BASEPROF = [[0,0],[1,0],[1,.07],[.86,.12],[.7,.16]];
+const geoCache = {};
+function pieceGeo(t) {
+  const key = t + P.s;
+  if (geoCache[key]) return geoCache[key];
+  const R = PT[t].d * P.s / 2, H = pieceH(t);
+  const pts = BASEPROF.concat(PROFILES[t]).map(([r, y]) => new THREE.Vector2(Math.max(r * R, 0.001), y * H));
+  const geos = [new THREE.LatheGeometry(pts, 36)];
+  if (t === 'K') { const a = new THREE.BoxGeometry(R * .22, H * .1, R * .22); a.translate(0, H * .96, 0); const b = new THREE.BoxGeometry(R * .6, R * .22, R * .22); b.translate(0, H * .965, 0); geos.push(a, b); }
+  if (t === 'N') { const hd = new THREE.BoxGeometry(R * .9, H * .55, R * 1.5); hd.rotateX(-0.35); hd.translate(0, H * .7, R * .15); geos.push(hd); }
+  return (geoCache[key] = geos);
+}
+function makePieceMesh(p) {
+  if (p.mesh) scene.remove(p.mesh);
+  const g = new THREE.Group();
+  pieceGeo(p.t).forEach(geo => g.add(mesh(geo, p.c === 'w' ? M.pw : M.pb)));
+  if (p.t === 'N') g.rotation.y = p.c === 'w' ? 0 : Math.PI;
+  g.userData.piece = p;
+  p.mesh = g; scene.add(g); placePieceAtLoc(p);
+}
+function placePieceAtLoc(p) { const c = locPoint(p.loc); p.mesh.position.copy(V(c.x, c.y, 0)); }
+
+// Kol modeli: taban → yaw grubu (yerel +z = kol yönü, +y = yukarı, x = eklem eksenleri)
+const RM = {
+  alu: new THREE.MeshStandardMaterial({ color: 0xd3dae0, metalness: 0.45, roughness: 0.32 }),
+  body: new THREE.MeshStandardMaterial({ color: 0x343b44, metalness: 0.3, roughness: 0.45 }),
+  servo: new THREE.MeshStandardMaterial({ color: 0x17191c, metalness: 0.1, roughness: 0.55 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0xe6e9ec, metalness: 0.95, roughness: 0.2 }),
+  rubber: new THREE.MeshStandardMaterial({ color: 0x101112, metalness: 0, roughness: 0.9 }),
+  cable: new THREE.MeshStandardMaterial({ color: 0x1a1c1f, metalness: 0.1, roughness: 0.6 }),
+};
+// Yuvarlak uçlu, hafifletme delikli kol plakası; boy yerel +z boyunca 0…L
+function plateGeo(L, h, t) {
+  const s = new THREE.Shape(), r = h / 2;
+  s.moveTo(0, -r); s.lineTo(L, -r); s.absarc(L, 0, r, -Math.PI / 2, Math.PI / 2, false); s.lineTo(0, r); s.absarc(0, 0, r, Math.PI / 2, Math.PI * 1.5, false);
+  const ring = (x, rr) => { const p = new THREE.Path(); p.absarc(x, 0, rr, 0, Math.PI * 2, true); s.holes.push(p); };
+  ring(0, r * 0.3); ring(L, r * 0.3);
+  const span = L - 2 * h;
+  if (span > h) {
+    const n = Math.max(1, Math.round(span / (h * 1.8))), w = span / n, sr = r * 0.42;
+    for (let i = 0; i < n; i++) {
+      const cx = h + w * (i + 0.5), sl = w * 0.36;
+      if (sl <= sr) continue;
+      const p = new THREE.Path();
+      p.moveTo(cx - sl + sr, -sr); p.lineTo(cx + sl - sr, -sr); p.absarc(cx + sl - sr, 0, sr, -Math.PI / 2, Math.PI / 2, false);
+      p.lineTo(cx - sl + sr, sr); p.absarc(cx - sl + sr, 0, sr, Math.PI / 2, Math.PI * 1.5, false);
+      s.holes.push(p);
+    }
+  }
+  const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 20 });
+  g.translate(0, 0, -t / 2); g.rotateY(-Math.PI / 2);
+  return g;
+}
+function platePair(L, h, t, gap, m = RM.alu) {
+  const g = new THREE.Group(), geo = plateGeo(L, h, t);
+  [-1, 1].forEach(sg => { const p = mesh(geo, m); p.position.x = sg * gap / 2; g.add(p); });
+  return g;
+}
+// Servo: çıkış mili +x yönünde, turuncu servo kolu (horn) ile
+function servoModel(k = 1) {
+  const g = new THREE.Group();
+  const body = mesh(new THREE.BoxGeometry(3.0, 2.0, 4.0), RM.servo); body.position.x = -0.2; g.add(body);
+  const ears = mesh(new THREE.BoxGeometry(0.22, 2.0, 5.4), RM.servo); ears.position.x = 0.75; g.add(ears);
+  const cap = mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.4, 24), RM.servo); cap.rotation.z = Math.PI / 2; cap.position.x = 1.45; g.add(cap);
+  const horn = mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.28, 32), M.accent); horn.rotation.z = Math.PI / 2; horn.position.x = 1.78; g.add(horn);
+  const screw = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 12), RM.steel); screw.rotation.z = Math.PI / 2; screw.position.x = 1.95; g.add(screw);
+  g.scale.setScalar(k);
+  return g;
+}
+function bolt(parent, x, y, z, r = 0.32) {
+  const b = mesh(new THREE.CylinderGeometry(r, r, 0.25, 6), RM.steel); b.rotation.z = Math.PI / 2; b.position.set(x, y, z); parent.add(b);
+}
+const arm = {};
+// İkinci tasarım: kalın gövdeli, 3B baskı endüstriyel kol (pembe PLA)
+function buildArmPink() {
+  const PK = new THREE.MeshStandardMaterial({ color: 0xec5fa3, metalness: 0.05, roughness: 0.55, envMapIntensity: 0.55 });
+  const PK2 = new THREE.MeshStandardMaterial({ color: 0xc8467f, metalness: 0.05, roughness: 0.6, envMapIntensity: 0.55 });
+  const BL = RM.rubber, L4 = P.L4;
+  const cylX = (r, len, m) => { const o = mesh(new THREE.CylinderGeometry(r, r, len, 40), m); o.rotation.z = Math.PI / 2; return o; };
+  const cylZ = (r, len, m) => { const o = mesh(new THREE.CylinderGeometry(r, r, len, 40), m); o.rotation.x = Math.PI / 2; return o; };
+  const ringX = (r, x, z, parent) => { const o = mesh(new THREE.TorusGeometry(r, 0.16, 8, 48), BL); o.rotation.y = Math.PI / 2; o.position.set(x, 0, z); parent.add(o); return o; };
+  const root = new THREE.Group(); arm.root = root; scene.add(root);
+  const B = basePos(); root.position.copy(V(B.x, B.y, 0));
+  // sabit taban tamburu + J1 tahrik kutusu
+  const drum = mesh(new THREE.CylinderGeometry(BASE_R - 0.4, BASE_R, 2.6, 64), PK); drum.position.y = 1.3; root.add(drum);
+  const band = mesh(new THREE.CylinderGeometry(BASE_R - 0.34, BASE_R - 0.34, 0.45, 64), BL); band.position.y = 2.35; root.add(band);
+  const mot = new THREE.Group(); mot.position.set(0, 3, -11.6); root.add(mot);
+  const mbr = mesh(new THREE.BoxGeometry(6.4, 6, 3), PK); mbr.position.z = 1.4; mot.add(mbr);
+  const mb = mesh(new THREE.BoxGeometry(5.6, 5.6, 4.6), RM.steel); mb.position.z = -2.2; mot.add(mb);
+  const mc = mesh(new THREE.BoxGeometry(5.7, 5.7, 1.1), BL); mc.position.z = -4.4; mot.add(mc);
+  // dönen gövde
+  const yaw = new THREE.Group(); arm.yaw = yaw; root.add(yaw);
+  const turn = mesh(new THREE.CylinderGeometry(7.4, 7.4, 2.6, 64), PK); turn.position.y = 3.9; yaw.add(turn);
+  const tr = mesh(new THREE.CylinderGeometry(7.46, 7.46, 0.35, 64), BL); tr.position.y = 4.7; yaw.add(tr);
+  const colB = 5.2, colH = Math.max(P.L1 - 3.5 - colB, 0.5);
+  const colm = mesh(new THREE.BoxGeometry(8.4, colH, 7.4), PK); colm.position.y = colB + colH / 2; yaw.add(colm);
+  const vent = mesh(new THREE.BoxGeometry(3.2, Math.min(colH * 0.5, 5), 0.2), BL); vent.position.set(0, colB + colH * 0.55, 3.72); yaw.add(vent);
+  [-1, 1].forEach(sg => {
+    const cheek = mesh(new THREE.BoxGeometry(1.6, 6, 7.4), PK); cheek.position.set(sg * 4.6, P.L1 - 2, 0); yaw.add(cheek);
+    const disc = cylX(4.2, 1.6, PK); disc.position.set(sg * 4.6, P.L1, 0); yaw.add(disc);
+    const cap = cylX(2.3, 0.3, PK2); cap.position.set(sg * 5.5, P.L1, 0); yaw.add(cap);
+    const r = mesh(new THREE.TorusGeometry(4.2, 0.18, 8, 48), BL); r.rotation.y = Math.PI / 2; r.position.set(sg * 5.42, P.L1, 0); yaw.add(r);
+  });
+  const shS = servoModel(0.9); shS.position.set(-6.9, P.L1 - 3.2, 0); shS.rotation.set(Math.PI / 2, Math.PI, 0); yaw.add(shS);
+  // üst kol: kutu kiriş, dirsekte çatal
+  arm.upG = new THREE.Group(); yaw.add(arm.upG);
+  const beamL = Math.max(P.L2 - 3.2, 1);
+  const beam = mesh(new THREE.BoxGeometry(6.2, 4.8, beamL), PK); beam.position.z = beamL / 2; arm.upG.add(beam);
+  arm.upG.add(cylX(3.4, 7.0, PK));
+  const slot = mesh(new THREE.BoxGeometry(2.4, 0.2, beamL * 0.4), BL); slot.position.set(0, 2.42, beamL * 0.5); arm.upG.add(slot);
+  [-1, 1].forEach(sg => {
+    const fk = mesh(new THREE.BoxGeometry(1.3, 4.8, 3.4), PK); fk.position.set(sg * 3.0, 0, P.L2 - 1.6); arm.upG.add(fk);
+    const d = cylX(3.2, 1.3, PK); d.position.set(sg * 3.0, 0, P.L2); arm.upG.add(d);
+    const c = cylX(1.6, 0.3, PK2); c.position.set(sg * 3.75, 0, P.L2); arm.upG.add(c);
+    ringX(3.2, sg * 3.68, P.L2, arm.upG);
+  });
+  const elS = servoModel(0.8); elS.position.set(4.6, 0, P.L2 - 4); elS.rotation.x = Math.PI / 2; arm.upG.add(elS);
+  // ön kol: dirsek gövdesi + boru, bilekte çatal
+  arm.foreG = new THREE.Group(); yaw.add(arm.foreG);
+  arm.foreG.add(cylX(2.4, 4.6, PK));
+  const fh = mesh(new THREE.BoxGeometry(4.6, 4.8, 5), PK); fh.position.z = 2.5; arm.foreG.add(fh);
+  const tubeL = Math.max(P.L3 - 7.5, 1);
+  const tube = cylZ(2.1, tubeL, PK); tube.position.z = 5 + tubeL / 2; arm.foreG.add(tube);
+  const collar = cylZ(2.45, 0.7, BL); collar.position.z = 5.3; arm.foreG.add(collar);
+  const wbx = mesh(new THREE.BoxGeometry(5.2, 4.2, 2.5), PK); wbx.position.z = P.L3 - 3.0; arm.foreG.add(wbx);
+  [-1, 1].forEach(sg => {
+    const pl = mesh(new THREE.BoxGeometry(0.9, 3.6, 2.4), PK); pl.position.set(sg * 2.2, 0, P.L3 - 1.0); arm.foreG.add(pl);
+    const d = cylX(1.8, 0.9, PK); d.position.set(sg * 2.2, 0, P.L3); arm.foreG.add(d);
+  });
+  const wrS = servoModel(0.6); wrS.position.set(3.6, 0, P.L3); wrS.rotation.x = Math.PI / 2; arm.foreG.add(wrS);
+  // tutucu: bilek bloğu → dönüş diski → raylı paralel parmaklar
+  arm.gp = new THREE.Group(); yaw.add(arm.gp);
+  arm.gp.add(cylX(1.75, 3.4, PK));
+  const wb = mesh(new THREE.BoxGeometry(3.4, 3.6, L4 * 0.3), PK); wb.position.z = L4 * 0.15; arm.gp.add(wb);
+  const rot = cylZ(2.3, L4 * 0.1, P.axes === 5 ? BL : PK2); rot.position.z = L4 * 0.35; arm.gp.add(rot);
+  arm.gr = new THREE.Group(); arm.gp.add(arm.gr);
+  const disk = cylZ(2.6, L4 * 0.07, PK); disk.position.z = L4 * 0.435; arm.gr.add(disk);
+  const bar = mesh(new THREE.BoxGeometry(9.4, 2.2, 1.0), PK); bar.position.z = L4 * 0.52; arm.gr.add(bar);
+  [-0.65, 0.65].forEach(y => { const rod = cylX(0.3, 10.4, PK2); rod.position.set(0, y, L4 * 0.6); arm.gr.add(rod); });
+  [-1, 1].forEach(sg => { const e = mesh(new THREE.BoxGeometry(0.6, 2.4, 1.6), PK); e.position.set(sg * 5.0, 0, L4 * 0.6); arm.gr.add(e); });
+  const gsv = mesh(new THREE.BoxGeometry(3.2, 1.6, 2.4), RM.servo); gsv.position.set(0, 2.0, L4 * 0.5); arm.gr.add(gsv);
+  const finger = sg => {
+    const g = new THREE.Group();
+    const sl = mesh(new THREE.BoxGeometry(1.4, 2.4, 1.4), PK); sl.position.z = L4 * 0.6; g.add(sl);
+    const pl = mesh(new THREE.BoxGeometry(P.fingerT, 2.4, L4 * 0.42), PK); pl.position.z = L4 * 0.79; g.add(pl);
+    const br = mesh(new THREE.BoxGeometry(P.fingerT * 0.8, 0.5, L4 * 0.3), PK); br.position.set(sg * 1.1, 0, L4 * 0.72); br.rotation.y = sg * 0.55; g.add(br);
+    const pad = mesh(new THREE.BoxGeometry(0.2, 2.0, L4 * 0.16), RM.rubber); pad.position.set(-sg * (P.fingerT / 2 + 0.1), 0, L4 * 0.91); g.add(pad);
+    arm.gr.add(g); return g;
+  };
+  arm.f1 = finger(1); arm.f2 = finger(-1);
+  arm.cable = null;
+}
+function buildArm() {
+  if (arm.root) scene.remove(arm.root);
+  if (STYLE === 'pink') return buildArmPink();
+  const root = new THREE.Group(); arm.root = root; scene.add(root);
+  const B = basePos(); root.position.copy(V(B.x, B.y, 0));
+  // sabit taban: ayak + rulman halkası
+  const foot = mesh(new THREE.CylinderGeometry(BASE_R - 0.5, BASE_R, 1.4, 64), RM.body); foot.position.y = 0.7; root.add(foot);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2, b = mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 8), RM.steel); b.position.set(Math.cos(a) * (BASE_R - 0.9), 1.45, Math.sin(a) * (BASE_R - 0.9)); root.add(b); }
+  const bearing = mesh(new THREE.TorusGeometry(7.4, 0.35, 12, 64), RM.steel); bearing.rotation.x = Math.PI / 2; bearing.position.y = 1.55; root.add(bearing);
+  const yaw = new THREE.Group(); arm.yaw = yaw; root.add(yaw);
+  // döner tabla + gövde
+  const turn = mesh(new THREE.CylinderGeometry(7.2, 7.2, 1.0, 64), RM.body); turn.position.y = 2.1; yaw.add(turn);
+  const stripe = mesh(new THREE.TorusGeometry(7.2, 0.12, 8, 64), M.accent); stripe.rotation.x = Math.PI / 2; stripe.position.y = 2.62; yaw.add(stripe);
+  const colH = Math.max(P.L1 - 6, 0.4);
+  const colm = mesh(new THREE.CylinderGeometry(3.9, 4.6, colH, 48), RM.body); colm.position.y = 2.6 + colH / 2; yaw.add(colm);
+  const collar = mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.5, 48), RM.alu); collar.position.y = 2.6 + colH; yaw.add(collar);
+  // U braket ve omuz servosu
+  const brH = Math.max(P.L1 - (2.6 + colH), 1);
+  [-1, 1].forEach(sg => {
+    const pl = mesh(new THREE.BoxGeometry(0.4, brH, 6), RM.alu); pl.position.set(sg * 3.25, P.L1 - brH / 2, 0); yaw.add(pl);
+    const top = mesh(new THREE.CylinderGeometry(3, 3, 0.4, 32), RM.alu); top.rotation.z = Math.PI / 2; top.position.set(sg * 3.25, P.L1, 0); yaw.add(top);
+    bolt(yaw, sg * 3.5, P.L1 - brH + 0.8, 2); bolt(yaw, sg * 3.5, P.L1 - brH + 0.8, -2);
+  });
+  const shS = servoModel(1); shS.position.y = P.L1; shS.rotation.x = Math.PI / 2; yaw.add(shS);
+  // üst kol: plaka çifti + dirsek servosu
+  arm.upG = new THREE.Group(); yaw.add(arm.upG);
+  arm.upG.add(platePair(P.L2, 3.6, 0.3, 5.1));
+  const elS = servoModel(0.9); elS.position.z = P.L2; elS.rotation.x = Math.PI / 2; arm.upG.add(elS);
+  const spacer = mesh(new THREE.CylinderGeometry(0.35, 0.35, 5.1, 10), RM.steel); spacer.rotation.z = Math.PI / 2; spacer.position.set(0, 0, P.L2 * 0.5); arm.upG.add(spacer);
+  // ön kol: plaka çifti + bilek servosu
+  arm.foreG = new THREE.Group(); yaw.add(arm.foreG);
+  arm.foreG.add(platePair(P.L3, 3.0, 0.3, 4.1));
+  const wrS = servoModel(0.72); wrS.position.z = P.L3; wrS.rotation.x = Math.PI / 2; arm.foreG.add(wrS);
+  const sp2 = spacer.clone(); sp2.scale.y = 4.1 / 5.1; sp2.position.set(0, 0, P.L3 * 0.5); arm.foreG.add(sp2);
+  // tutucu: eğim braketi → dönüş servosu → avuç, dişliler, parmaklar
+  const L4 = P.L4;
+  arm.gp = new THREE.Group(); yaw.add(arm.gp);
+  arm.gp.add(platePair(L4 * 0.3, 2.6, 0.3, 3.2));
+  const roll = P.axes === 5
+    ? mesh(new THREE.BoxGeometry(2.0, 4.0, L4 * 0.2), RM.servo)
+    : mesh(new THREE.BoxGeometry(2.4, 2.4, L4 * 0.2), RM.alu);
+  roll.position.z = L4 * 0.38; arm.gp.add(roll);
+  arm.gr = new THREE.Group(); arm.gp.add(arm.gr);
+  const rollHorn = mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.3, 28), M.accent); rollHorn.rotation.x = Math.PI / 2; rollHorn.position.z = L4 * 0.49; arm.gr.add(rollHorn);
+  const palm = mesh(new THREE.BoxGeometry(6.6, 2.6, 0.6), RM.alu); palm.position.z = L4 * 0.53; arm.gr.add(palm);
+  const gs = mesh(new THREE.BoxGeometry(3.2, 1.6, 2.6), RM.servo); gs.position.set(0, 2.0, L4 * 0.5); arm.gr.add(gs);
+  [-1, 1].forEach(sg => {
+    const gear = mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.35, 14), M.accent); gear.position.set(sg * 1.0, 1.45, L4 * 0.6); arm.gr.add(gear);
+    bolt(arm.gr, sg * 2.8, 0, L4 * 0.53 + 0.1, 0.22);
+  });
+  const finger = sg => {
+    const g = new THREE.Group();
+    const pl = mesh(new THREE.BoxGeometry(P.fingerT, 2.2, L4 * 0.47), RM.alu); pl.position.z = L4 * 0.765; g.add(pl);
+    const bar = mesh(new THREE.BoxGeometry(P.fingerT * 0.8, 0.5, L4 * 0.12), RM.alu); bar.position.set(sg * 0.6, 1.2, L4 * 0.58); bar.rotation.y = sg * 0.6; g.add(bar);
+    const pad = mesh(new THREE.BoxGeometry(0.2, 1.9, L4 * 0.18), RM.rubber); pad.position.set(-sg * (P.fingerT / 2 + 0.1), 0, L4 * 0.9); g.add(pad);
+    arm.gr.add(g); return g;
+  };
+  arm.f1 = finger(1); arm.f2 = finger(-1);
+  arm.cable = null;
+}
+const Lp = (r, z) => new THREE.Vector3(0, z, r);
+function cableCurve(f, sol) {
+  const n = a => [-Math.sin(a), Math.cos(a)];
+  const off = (p, a, d) => { const k = n(a); return [p[0] + k[0] * d, p[1] + k[1] * d]; };
+  const pk = STYLE === 'pink';
+  const pts = pk
+    ? [[3.4, -4.4, 5.6], [3.4, -4.6, P.L1 * 0.6], [2.4, f.S[0] - 5.4, f.S[1] + 2.4]]
+    : [[3.6, -4.2, 2.8], [3.6, -4.4, P.L1 * 0.6], [3.9, f.S[0] - 2.2, f.S[1] + 1]];
+  [[f.S, sol.th2, 0.3], [f.E, sol.th2, 0.85]].forEach(([p, a, t]) => { const q = off([lerp(f.S[0], f.E[0], t), lerp(f.S[1], f.E[1], t)], a, pk ? 2.75 : 2.3); pts.push([pk ? 1.6 : 3.0, q[0], q[1]]); });
+  [[0.25], [0.85]].forEach(([t]) => { const q = off([lerp(f.E[0], f.W[0], t), lerp(f.E[1], f.W[1], t)], sol.ph3, pk ? 2.35 : 2.0); pts.push([pk ? 0.8 : 2.5, q[0], q[1]]); });
+  pts.push([2.0, f.W[0] + 0.6, f.W[1] - P.L4 * 0.25]);
+  return new THREE.CatmullRomCurve3(pts.map(([x, r, z]) => new THREE.Vector3(x, z, r)));
+}
+function updateArm(sol) {
+  const f = fkPlane(sol);
+  arm.yaw.rotation.y = sol.th1;
+  arm.upG.position.copy(Lp(...f.S)); arm.upG.rotation.x = -sol.th2;
+  arm.foreG.position.copy(Lp(...f.E)); arm.foreG.rotation.x = -sol.ph3;
+  arm.gp.position.copy(Lp(...f.W)); arm.gp.rotation.x = -sol.ph4; arm.gr.rotation.z = sol.psi;
+  const x = state.gap / 2 + P.fingerT / 2;
+  arm.f1.position.x = x; arm.f2.position.x = -x;
+  if (arm.cable) { arm.yaw.remove(arm.cable); arm.cable.geometry.dispose(); }
+  arm.cable = mesh(new THREE.TubeGeometry(cableCurve(f, sol), 48, 0.22, 6, false), RM.cable);
+  arm.yaw.add(arm.cable);
+  if (state.held) {
+    const T = toWorld(sol, f.T);
+    state.held.mesh.position.copy(V(T.x, T.y, T.z - graspZ(state.held.t)));
+  }
+}
+
+// Kamera yörüngesi
+const orbit = { th: 0.62, ph: 1.0, dist: 135, tgt: new THREE.Vector3(0, 11, -12) };
+function updCam() {
+  const { th, ph, dist, tgt } = orbit;
+  camera.position.set(tgt.x + dist * Math.sin(ph) * Math.sin(th), tgt.y + dist * Math.cos(ph), tgt.z + dist * Math.sin(ph) * Math.cos(th));
+  camera.lookAt(tgt); dirty = true;
+}
+let dirty = true;
+function resize() {
+  const w = vp.clientWidth, h = vp.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); dirty = true;
+}
+new ResizeObserver(resize).observe(vp);
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const objs = tiles.concat(state.pieces.map(p => p.mesh));
+  const hit = ray.intersectObjects(objs, true)[0];
+  if (!hit) return null;
+  let o = hit.object;
+  while (o && !o.userData.piece && !o.userData.kind) o = o.parent;
+  if (!o) return null;
+  if (o.userData.piece) { const p = o.userData.piece; return p.loc.kind === 'sq' ? { kind: 'sq', key: p.loc.key } : { ...p.loc }; }
+  return { ...o.userData };
+}
+const ptrs = new Map(); let drag = null, pinch0 = 0;
+const cv = renderer.domElement;
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); drag = { x: e.clientX, y: e.clientY, moved: false }; if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); } });
+cv.addEventListener('pointermove', e => {
+  if (ptrs.has(e.pointerId)) {
+    const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch0) { orbit.dist = clamp(orbit.dist * pinch0 / d, 45, 260); updCam(); } pinch0 = d; if (drag) drag.moved = true; return;
+    }
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+    if (drag && drag.moved) { orbit.th -= dx * 0.008; orbit.ph = clamp(orbit.ph - dy * 0.008, 0.12, 1.45); updCam(); }
+  } else if (e.pointerType === 'mouse') hover(pick(e));
+});
+const endPtr = e => {
+  const wasClick = drag && !drag.moved && ptrs.size === 1;
+  ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0;
+  if (wasClick && e.type === 'pointerup') clickLoc(pick(e));
+  if (ptrs.size === 0) drag = null;
+};
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('pointerleave', () => hover(null));
+cv.addEventListener('wheel', e => { e.preventDefault(); orbit.dist = clamp(orbit.dist * (1 + e.deltaY * 0.001), 45, 260); updCam(); }, { passive: false });
+
+function ringAt(ring, loc) { if (!loc) { ring.visible = false; dirty = true; return; } const c = locPoint(loc); ring.position.copy(V(c.x, c.y, 0.06)); ring.visible = true; dirty = true; }
+function hover(loc) {
+  ringAt(hovRing, loc);
+  const chip = $('#hoverChip');
+  if (!loc) { chip.hidden = true; return; }
+  const c = locPoint(loc), sol = ik(c.x, c.y, graspZ('P'));
+  const L = loads(sol, P.pieceMass / 1000);
+  chip.hidden = false;
+  chip.className = 'chip' + (sol.reach ? '' : ' err');
+  chip.textContent = `${locLabel(loc)} · yatay ${sol.r.toFixed(1)} cm · ` + (sol.reach ? `omuz ${L.req[1].toFixed(1)} kg·cm · uç sapması ±${tipErr(sol).rss.toFixed(1)} mm` + (collide(sol) ? ' · çarpışma riski' : '') : `ulaşılamaz (gereken ${sol.D.toFixed(1)} cm, kol ${(P.L2 + P.L3).toFixed(1)} cm)`);
+}
+function clickLoc(loc) {
+  if (rosMode) return; // Live commands use the explicit UCI input.
+  if (!loc || loc.kind !== 'sq' || anim.running) return;
+  if (!state.sel) {
+    if (!state.board[loc.key]) { setStatus(`${loc.key} karesinde taş yok`, 'err'); return; }
+    if (P.rules && state.board[loc.key].c !== game.turn) { setStatus(`Sıra ${game.turn === 'w' ? 'beyazda' : 'siyahta'}`, 'err'); return; }
+    state.sel = loc.key; ringAt(selRing, loc); setStatus(`Kaynak: ${loc.key}. Şimdi hedef kareye tıkla.`, 'act');
+  } else {
+    const from = state.sel; state.sel = null; ringAt(selRing, null);
+    if (from === loc.key) { setStatus('Seçim iptal'); return; }
+    const p = state.board[from];
+    const promo = p && p.t === 'P' && ((p.c === 'w' && loc.key[1] === '8') || (p.c === 'b' && loc.key[1] === '1'));
+    const mv = from + loc.key + (promo ? 'q' : '');
+    $('#moveInput').value = mv; doMove(mv);
+  }
+}
+
+// ---------- Animasyon ----------
+const anim = { queue: [], cur: null, running: false, peak: [0, 0, 0, 0, 0], after: null };
+let demoQ = [], history = [];
+function setStatus(t, cls = '') { const c = $('#stChip'); c.textContent = t; c.className = 'chip' + (cls ? ' ' + cls : ''); }
+function transferSegs(tr) {
+  const fp = locPoint(tr.from), tp = locPoint(tr.to), tz = travelZ(), gz = graspZ(tr.piece.t);
+  const open = graspD(tr.piece.t) + 2 * P.openClear, closed = graspD(tr.piece.t);
+  const nm = NAME[tr.piece.t];
+  return [
+    { type: 'move', mode: 'cyl', to: { x: fp.x, y: fp.y, z: tz }, label: `${locLabel(tr.from)} üstüne gidiyor` },
+    { type: 'jaw', g: open, label: 'Tutucu açılıyor' },
+    { type: 'move', mode: 'lin', to: { x: fp.x, y: fp.y, z: gz }, label: `${nm} için iniyor` },
+    { type: 'jaw', g: closed, grab: tr.piece, label: `${nm} kavrandı` },
+    { type: 'move', mode: 'lin', to: { x: fp.x, y: fp.y, z: tz }, label: 'Kaldırıyor' },
+    { type: 'move', mode: 'cyl', to: { x: tp.x, y: tp.y, z: tz }, label: `${locLabel(tr.to)} üstüne taşıyor` },
+    { type: 'move', mode: 'lin', to: { x: tp.x, y: tp.y, z: gz }, label: 'Bırakmak için iniyor' },
+    { type: 'jaw', g: open, release: tr.piece, label: `${nm} bırakıldı (${locLabel(tr.to)})` },
+    { type: 'move', mode: 'lin', to: { x: tp.x, y: tp.y, z: tz }, label: 'Yükseliyor' },
+  ];
+}
+function moveTime(segs) { // servo hız katalog değerinin %70'i ile
+  let t = 0, prev = ik(state.tip.x, state.tip.y, state.tip.z);
+  const ks = ['J1', 'J2', 'J3', 'J4', 'J5'];
+  for (const sg of segs) {
+    if (sg.type === 'jaw') { t += 0.35; continue; }
+    const s = ik(sg.to.x, sg.to.y, sg.to.z);
+    let m = 0;
+    ks.forEach((k, i) => { if (i === 4 && P.axes === 4) return; const w = 60 / SERVOS[SV[k]].spd[P.V] * 0.7; m = Math.max(m, Math.abs(s.s[i] - prev.s[i]) / w); });
+    t += m + 0.08; prev = s;
+  }
+  return t;
+}
+// opts.bypass: gösterim (kural ve sıra denetimi yok), opts.engine: hamleyi robot rakip seçti
+function doMove(str, opts = {}) {
+  if (rosMode) { window.dispatchEvent(new CustomEvent('ros-move', { detail: str })); return true; }
+  if (anim.running) { setStatus('Robot hâlâ hareket ediyor', 'err'); return false; }
+  const m = /^\s*([a-h])([1-8])[\s\-x:]*([a-h])([1-8])\s*([qrbnQRBN])?\s*$/.exec(str || '');
+  if (!m) { setStatus('Hamleyi e2e4 biçiminde yaz (terfi için e7e8q)', 'err'); return false; }
+  const from = m[1] + m[2], to = m[3] + m[4];
+  const p = state.board[from];
+  if (!p) { setStatus(`${from} karesinde taş yok`, 'err'); return false; }
+  if (game.over && !opts.bypass) { setStatus('Oyun bitti. Yeni oyun için "Taşları dağıt"a bas.', 'err'); return false; }
+  if (!opts.bypass && !opts.engine && P.engine && game.turn === 'b') { setStatus('Sıra robotta, hamlesini bekle', 'err'); return false; }
+  const B0 = snapshot();
+  let lm = null;
+  if (P.rules && !opts.bypass) {
+    if (p.c !== game.turn) { setStatus(`Sıra ${game.turn === 'w' ? 'beyazda' : 'siyahta'}`, 'err'); return false; }
+    const want = m[5] ? m[5].toUpperCase() : 'Q';
+    lm = legal(B0, game).find(x => x.from === from && x.to === to && (!x.promo || x.promo === want));
+    if (!lm) { setStatus(`${from}-${to} kurallara uygun değil`, 'err'); return false; }
+  }
+  const capKey = lm && lm.ep ? lm.ep : to;
+  const q = state.board[capKey];
+  if (q && q.c === p.c) { setStatus(`${to} karesinde kendi taşın var`, 'err'); return false; }
+  const T = [];
+  const zoneTaken = { w: new Set(), b: new Set() };
+  const slotFor = side => { const z = state.zone[side]; for (let i = 1; i < nSlots(); i++) if (!z[i] && !zoneTaken[side].has(i)) { zoneTaken[side].add(i); return i; } return -1; };
+  if (q) { const i = slotFor(q.c); if (i < 0) { setStatus(`Bölme dolu: ${zc()}×${zr()} bölmede yenen taşa yer kalmadı. Panelden daha büyük bölme seç.`, 'err'); return false; } T.push({ piece: q, from: { kind: 'sq', key: capKey }, to: { kind: 'zone', side: q.c, idx: i } }); }
+  const promo = p.t === 'P' && ((p.c === 'w' && m[4] === '8') || (p.c === 'b' && m[4] === '1'));
+  if (promo) {
+    const pt = (m[5] || 'q').toUpperCase();
+    const res = state.zone[p.c].find(z => z && z.t === pt);
+    if (!res) { setStatus(`${p.c === 'w' ? 'Beyaz' : 'Siyah'} bölmede yedek ${NAME[pt]} yok`, 'err'); return false; }
+    const i = slotFor(p.c); if (i < 0) { setStatus('Bölme dolu, piyonu koyacak yer yok', 'err'); return false; }
+    T.push({ piece: p, from: { kind: 'sq', key: from }, to: { kind: 'zone', side: p.c, idx: i } });
+    T.push({ piece: res, from: { ...res.loc }, to: { kind: 'sq', key: to } });
+  } else {
+    T.push({ piece: p, from: { kind: 'sq', key: from }, to: { kind: 'sq', key: to } });
+    const df = FILES.indexOf(m[3]) - FILES.indexOf(m[1]);
+    if (p.t === 'K' && Math.abs(df) === 2 && m[2] === m[4]) {
+      const rf = (df > 0 ? 'h' : 'a') + m[2], rt = (df > 0 ? 'f' : 'd') + m[2], rk = state.board[rf];
+      if (rk && rk.t === 'R' && rk.c === p.c && !state.board[rt]) T.push({ piece: rk, from: { kind: 'sq', key: rf }, to: { kind: 'sq', key: rt } });
+    }
+  }
+  const segs = T.flatMap(transferSegs);
+  const h = homeTip(); segs.push({ type: 'move', mode: 'cyl', to: h, label: 'Eve dönüyor' });
+  const bad = [];
+  segs.forEach((sg, i) => { if (sg.type === 'move' && !ik(sg.to.x, sg.to.y, sg.to.z).reach) bad.push(sg.label.replace(/ (üstüne|için).*/, '')); });
+  if (bad.length) {
+    const tr = T.find(t => [t.from, t.to].some(l => { const c = locPoint(l); return !ik(c.x, c.y, travelZ()).reach || !ik(c.x, c.y, graspZ(t.piece.t)).reach; }));
+    const l = tr ? ([tr.from, tr.to].find(l => { const c = locPoint(l); return !ik(c.x, c.y, travelZ()).reach || !ik(c.x, c.y, graspZ(tr.piece.t)).reach; })) : null;
+    if (l) { const c = locPoint(l); const s1 = ik(c.x, c.y, travelZ()); setStatus(`${locLabel(l)} ulaşılamıyor: bilek için ${s1.D.toFixed(1)} cm gerekli, L2+L3 = ${(P.L2 + P.L3).toFixed(1)} cm`, 'err'); }
+    else setStatus('Yolun bir kısmına ulaşılamıyor', 'err');
+    return false;
+  }
+  $('#timeEst').textContent = `Gerçek servo hızıyla tahmini süre ≈ ${moveTime(segs).toFixed(1)} s`;
+  const mv = lm || { from, to, dbl: p.t === 'P' && Math.abs(+m[4] - +m[2]) === 2 };
+  game = nextState(game, B0, mv);
+  T.forEach(t => setLoc(t.piece, t.to));
+  let chk = false;
+  if (P.rules && !opts.bypass) {
+    const B1 = snapshot(), kk = kingKey(B1, game.turn);
+    chk = !!kk && attacked(B1, kk, game.turn === 'w' ? 'b' : 'w');
+    if (!legal(B1, game).length) game.over = chk ? 'mat' : 'pat';
+  }
+  anim.queue = segs; anim.cur = null; anim.running = true; anim.peak = [0, 0, 0, 0, 0]; anim.coll = false; anim.lastWasMove = true;
+  const tags = [];
+  if (q) tags.push(lm && lm.ep ? 'geçerken alma' : 'yeme');
+  if (promo) tags.push('terfi');
+  if (T.length > 1 && !q && !promo) tags.push('rok');
+  if (game.over) tags.push(game.over); else if (chk) tags.push('şah');
+  history.push((opts.engine ? 'robot ' : '') + from + to + (tags.length ? ` (${tags.join(', ')})` : ''));
+  renderHistory();
+  return true;
+}
+let HIST0 = '';
+function renderHistory() {
+  const h = $('#history');
+  if (!history.length) { h.innerHTML = HIST0; return; }
+  h.innerHTML = history.map((x, i) => `<span>${i + 1}. <b>${x}</b></span>`).join('');
+}
+function goHome() {
+  if (anim.running) return;
+  anim.queue = [{ type: 'move', mode: 'cyl', to: homeTip(), label: 'Eve dönüyor' }]; anim.cur = null; anim.running = true; anim.lastWasMove = false;
+}
+let demoActive = false;
+// Bir hamlenin animasyonu bitince: gösterime devam, oyun sonu ya da robotun cevabı
+function afterSeq() {
+  if (anim.coll && history.length) { history[history.length - 1] += ' · çarpışma riski'; renderHistory(); }
+  anim.coll = false;
+  if (demoQ.length) { setTimeout(() => { const n = demoQ.shift(); $('#moveInput').value = n; doMove(n, { bypass: true }); }, 350); return; }
+  if (demoActive) { demoActive = false; setStatus('Gösterim bitti. Oynamak için "Taşları dağıt"a bas.', 'act'); return; }
+  if (game.over) { setStatus(game.over === 'mat' ? `Mat! ${game.turn === 'w' ? 'Siyah (robot)' : 'Beyaz'} kazandı` : 'Pat, oyun berabere', 'act'); return; }
+  if (P.engine && game.turn === 'b' && anim.lastWasMove) {
+    setStatus('Robot düşünüyor…', 'act');
+    setTimeout(() => {
+      const mv = bestMove(snapshot(), game, 3);
+      if (!mv) { setStatus('Robotun yapacak hamlesi yok', 'err'); return; }
+      const s = mv.from + mv.to + (mv.promo ? mv.promo.toLowerCase() : '');
+      $('#moveInput').value = s; doMove(s, { engine: true });
+    }, 60);
+    return;
+  }
+  setStatus(`Hazır · sıra ${game.turn === 'w' ? 'beyazda' : 'siyahta'}`);
+}
+function stopAnim() {
+  anim.queue = []; anim.cur = null; anim.running = false; demoQ = [];
+  state.held = null; state.pieces.forEach(placePieceAtLoc);
+}
+const ease = k => k * k * (3 - 2 * k);
+function polar(p) { const B = basePos(); return { a: Math.atan2(p.x - B.x, -(p.y - B.y)), r: Math.hypot(p.x - B.x, p.y - B.y) }; }
+function step(dt) {
+  if (!anim.cur) {
+    anim.cur = anim.queue.shift();
+    if (!anim.cur) { anim.running = false; afterSeq(); return; }
+    const c = anim.cur; c.t = 0;
+    if (c.type === 'move') {
+      c.from = { ...state.tip };
+      if (c.mode === 'cyl') {
+        c.p0 = polar(c.from); c.p1 = polar(c.to);
+        const da = normA(c.p1.a - c.p0.a); c.p1.a = c.p0.a + da;
+        const len = Math.hypot(c.p1.r - c.p0.r, (c.p0.r + c.p1.r) / 2 * da, c.to.z - c.from.z);
+        c.dur = Math.max(0.35, len / P.speed);
+      } else c.dur = Math.max(0.25, Math.hypot(c.to.x - c.from.x, c.to.y - c.from.y, c.to.z - c.from.z) / P.speed);
+    } else { c.g0 = state.gap; c.dur = 0.35 * 14 / P.speed; }
+    setStatus(c.label + (anim.coll ? ' · çarpışma riski' : ''), anim.coll ? 'err' : 'act');
+  }
+  const c = anim.cur; c.t += dt;
+  const k = clamp(c.t / c.dur, 0, 1), e = ease(k);
+  if (c.type === 'move') {
+    if (c.mode === 'cyl') {
+      const B = basePos(), a = lerp(c.p0.a, c.p1.a, e), r = lerp(c.p0.r, c.p1.r, e);
+      state.tip = { x: B.x + Math.sin(a) * r, y: B.y - Math.cos(a) * r, z: lerp(c.from.z, c.to.z, e) };
+    } else state.tip = { x: lerp(c.from.x, c.to.x, e), y: lerp(c.from.y, c.to.y, e), z: lerp(c.from.z, c.to.z, e) };
+  } else state.gap = lerp(c.g0, c.g, e);
+  if (k >= 1) {
+    if (c.grab) state.held = c.grab;
+    if (c.release) { state.held = null; placePieceAtLoc(c.release); }
+    anim.cur = null;
+  }
+}
+
+// ---------- Arayüz: parametreler ----------
+const dec = st => (String(st).split('.')[1] || '').length;
+const PUI = {};
+function setParam(k, v) { P[k] = v; if (PUI[k]) { PUI[k].inp.value = v; PUI[k].show(); } }
+function buildPanel() {
+  const host = $('#params');
+  SPEC.forEach(g => {
+    const fs = document.createElement('fieldset'); fs.className = 'grp';
+    fs.innerHTML = `<legend>${g.g}</legend>`;
+    g.items.forEach(([k, label, min, max, st, def, unit]) => {
+      const row = document.createElement('div'); row.className = 'prm';
+      row.innerHTML = `<label for="p-${k}">${label}</label><output id="o-${k}" for="p-${k}"></output><input type="range" id="p-${k}" min="${min}" max="${max}" step="${st}" value="${def}">`;
+      fs.appendChild(row);
+      const inp = row.querySelector('input'), out = row.querySelector('output');
+      const show = () => out.textContent = (+inp.value).toFixed(dec(st)) + (unit ? ' ' + unit : '');
+      P[k] = +inp.value; show(); PUI[k] = { inp, show };
+      inp.addEventListener('input', () => { P[k] = +inp.value; show(); onParam(k); });
+    });
+    host.appendChild(fs);
+  });
+  const seg = (id, key) => $(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const v = b.dataset.v;
+    P[key] = isNaN(+v) ? v : +v;
+    $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    onParam(key);
+  });
+  seg('#axesSeg', 'axes'); seg('#voltSeg', 'V'); seg('#zoneSeg', 'zl'); seg('#rulesSeg', 'rules'); seg('#engSeg', 'engine'); seg('#driveSeg', 'drive');
+}
+function onParam(k) {
+  if (k === 'zl') {
+    stopAnim(); state.sel = null; ringAt(selRing, null);
+    buildBoard(); initPieces(); resetGame(); state.tip = homeTip();
+    setStatus(`Bölme düzeni ${zc()}×${zr()}. Yeni oyun başladı.`);
+  } else if (['s', 'zGap', 'baseGap'].includes(k)) {
+    stopAnim(); state.sel = null;
+    buildBoard(); buildArm(); state.pieces.forEach(makePieceMesh); state.tip = homeTip();
+  } else if (k === 'engine' && P.engine && !anim.running && game.turn === 'b' && !game.over) {
+    anim.lastWasMove = true; afterSeq();
+  } else if (['L1', 'L2', 'L3', 'L4', 'fingerT', 'axes'].includes(k)) buildArm();
+  if (!anim.running && ['clear', 'graspFrac', 'L4', 'L1'].includes(k)) state.tip = homeTip();
+  recalc();
+}
+
+// ---------- Tork tablosu ----------
+const kgnm = v => `${v.toFixed(1)} kg·cm<small>${(v * KGCM).toFixed(2)} N·m</small>`;
+const usageCls = u => u < 0.6 ? 'ok' : u < 0.85 ? 'warn' : 'bad';
+const TQ = {};
+function buildTorqueTable() {
+  const tb = $('#tq tbody'); tb.innerHTML = '';
+  JOINTS.forEach(j => {
+    const tr = document.createElement('tr'); tr.dataset.k = j.k;
+    const opts = Object.entries(SERVOS).map(([id, s]) => `<option value="${id}"${SV[j.k] === id ? ' selected' : ''}>${s.name}</option>`).join('');
+    tr.innerHTML = `<td>${j.name}</td><td><select id="sv-${j.k}" aria-label="${j.name} servo">${opts}</select></td><td class="num" data-c="now"></td><td class="num" data-c="peak"></td><td class="num" data-c="worst"></td><td class="num" data-c="cap"></td><td data-c="use"></td>`;
+    tb.appendChild(tr);
+    TQ[j.k] = Object.fromEntries([...tr.querySelectorAll('[data-c]')].map(td => [td.dataset.c, td]));
+    TQ[j.k].row = tr;
+    tr.querySelector('select').addEventListener('change', e => { SV[j.k] = e.target.value; if (j.k === 'G' || j.k === 'J3' || j.k === 'J4' || j.k === 'J5') buildArm(); recalc(); });
+  });
+}
+function bindCustomServo() {
+  const ids = ['cs-tq5', 'cs-tq6', 'cs-mass', 'cs-stall', 'cs-spd'];
+  const upd = () => {
+    const v = ids.map(id => +$('#' + id).value);
+    if (v.some(x => !(x > 0))) return;
+    Object.assign(SERVOS.CUSTOM, { tq: { 5: v[0], 6: v[1] }, mass: v[2], stall: v[3], spd: { 5: v[4] * 1.15, 6: v[4] } });
+    recalc();
+  };
+  ids.forEach(id => $('#' + id).addEventListener('input', upd));
+}
+function suggest(req) { const ok = Object.entries(SERVOS).filter(([id, s]) => id !== 'CUSTOM' && s.tq[P.V] * 0.7 >= req).sort((a, b) => a[1].tq[P.V] - b[1].tq[P.V])[0]; return ok ? ok[1].name : null; }
+function renderTorque() {
+  const W = WORST, g = W.grip, adv = [];
+  JOINTS.forEach((j, i) => {
+    const td = TQ[j.k], cap = SERVOS[SV[j.k]].tq[P.V];
+    const off = j.k === 'J5' && P.axes === 4;
+    td.row.style.opacity = off ? 0.45 : 1;
+    let worst, note;
+    if (j.k === 'G') { worst = g.tqReq; note = `taşı tutmak için`; }
+    else { worst = W.best[i].req; note = `${W.best[i].lab} · ${W.best[i].st.toFixed(1)} st + ${W.best[i].dy.toFixed(1)} din`; }
+    td.worst.innerHTML = off ? '—' : `${worst.toFixed(1)} kg·cm<small>${note}</small>`;
+    td.cap.innerHTML = kgnm(cap);
+    const u = worst / cap, cls = usageCls(u);
+    td.use.innerHTML = off ? '<span class="pill">devre dışı</span>' : `<div style="display:flex;gap:8px;align-items:center"><div class="bar"><i style="width:${Math.min(100, u * 100)}%;background:var(--${cls === 'ok' ? 'ok' : cls === 'warn' ? 'warn' : 'bad'})"></i></div><span class="pill ${cls}">%${Math.round(u * 100)}</span></div>`;
+    if (!off && u >= 0.85) { const s = suggest(worst); adv.push(`<b>${j.name}</b>: ${SERVOS[SV[j.k]].name} yetersiz (%${Math.round(u * 100)}).` + (s ? ` Önerilen: ${s}.` : ' Listedeki servolar yetmiyor; kolu kısalt, hafiflet ya da dişli redüksiyon ekle.')); }
+  });
+  const un = W.unreach.size, li = W.limits.size, clr = baseClear();
+  if (clr < 0) adv.push(`<b>Taban tahtaya ${(-clr).toFixed(1)} cm biniyor</b> (yan görünüşte kırmızı). Taban mesafesini en az ${(BASE_R + FRAME_W).toFixed(1)} cm yap ya da taban plakasını küçült.`);
+  if (un) adv.unshift(`<b>${un} konuma ulaşılamıyor</b> (3B görünümde kırmızı). L2+L3 = ${(P.L2 + P.L3).toFixed(1)} cm; en az ${(W.need || 0).toFixed(1)} cm gerekli.`);
+  if (li) adv.push(`${li} konumda servo açısı 0–180° dışına çıkıyor (sarı kareler). Montaj açısını ya da L1/L4 oranını değiştir.`);
+  if (W.coll.size) adv.push(`<b>${W.coll.size} konumda çarpışma riski</b> (camgöbeği kareler): üst kol, ön kol ya da bilek taşların üstünden yeterince yüksekte geçmiyor. L4’ü uzat ya da L1’i yükselt.`);
+  if (W.precBad) adv.push(`<b>${W.precBad} konumda servo hassasiyeti yetmiyor</b> (mor kareler): ayrıntılar Hassasiyet kartında.`);
+  const base = `Taban devirme momenti en çok <b>${W.maxM0.toFixed(0)} kg·cm</b> (${(W.maxM0 * KGCM).toFixed(1)} N·m). Bu yük taban servosunun miline binmemeli: kolu bir tabla rulmanının (lazy susan ya da 6008 rulman) üstüne oturt, servo yalnızca döndürsün.`;
+  $('#tqAdvice').innerHTML = (adv.length ? adv.join('<br>') : 'Tüm eklemler en kötü durumda servonun %85’inin altında. Tasarım bu haliyle tutarlı.') + '<br>' + base;
+  renderLive(true);
+}
+let liveL = null;
+function renderLive(force) {
+  if (!liveL) return;
+  JOINTS.forEach((j, i) => {
+    const td = TQ[j.k];
+    if (j.k === 'G') { const g = WORST.grip; td.now.innerHTML = state.held ? `${g.tqReq.toFixed(1)} kg·cm<small>tutuyor</small>` : `0.0 kg·cm<small>boşta</small>`; td.peak.innerHTML = anim.peak.some(v => v > 0) ? `${g.tqReq.toFixed(1)} kg·cm` : '—'; return; }
+    if (j.k === 'J5' && P.axes === 4) { td.now.textContent = td.peak.textContent = '—'; return; }
+    td.now.innerHTML = kgnm(liveL.req[i]);
+    td.peak.innerHTML = anim.peak[i] > 0 ? kgnm(anim.peak[i]) : '—';
+  });
+}
+
+// ---------- Ölçüler, tutucu, güç, Pi ----------
+function renderDims() {
+  const s = P.s, wTot = 8 * s + 2 * (P.zGap + zc() * s) + 1.6, dTot = 8 * s + P.baseGap + BASE_R + FRAME_W;
+  const capN = nSlots() - 1, clr = baseClear();
+  const items = [
+    ['Satranç tahtası', `${(8 * s).toFixed(1)} × ${(8 * s).toFixed(1)} cm`],
+    ['Kare', `${s.toFixed(1)} × ${s.toFixed(1)} cm`],
+    [`Her bölme (${zc()} × ${zr()} kare)`, `${(zc() * s).toFixed(1)} × ${(zr() * s).toFixed(1)} cm`],
+    ['Bölme kapasitesi (her renk)', `<span class="${capN >= 15 ? 'ok' : 'warn'}">${capN} yenen + 1 yedek</span> <small>${capN >= 15 ? 'bir oyunda yenebilecek 15 taşın hepsi sığar' : `bir oyunda 15 taşa kadar yenebilir; ${15 - capN} taş sığmaz`}</small>`],
+    ['Toplam yerleşim (genişlik × derinlik)', `${wTot.toFixed(1)} × ${dTot.toFixed(1)} cm`],
+    ['Taban plakası ile tahta arası', `<span class="${clr >= 0 ? 'ok' : 'bad'}">${clr >= 0 ? clr.toFixed(1) + ' cm boşluk' : (-clr).toFixed(1) + ' cm biniyor'}</span> <small>plaka yarıçapı ${BASE_R} cm, çerçeve ${FRAME_W} cm</small>`],
+    ['Şah boyu / taban çapı', `${pieceH('K').toFixed(1)} / ${(PT.K.d * s).toFixed(1)} cm`],
+    ['Piyon boyu / taban çapı', `${pieceH('P').toFixed(1)} / ${(PT.P.d * s).toFixed(1)} cm`],
+    ['Taşıma yüksekliği (parmak ucu)', `${travelZ().toFixed(1)} cm`],
+    ['En uzak yatay mesafe', `${WORST.maxR.toFixed(1)} cm`],
+    ['Gereken bilek erişimi', `${WORST.need.toFixed(1)} cm <small>${WORST.maxD.lab || 'ulaşılamayan konum var'}</small>`],
+    ['Kolun erişimi (L2+L3)', `${(P.L2 + P.L3).toFixed(1)} cm <small>pay ${(P.L2 + P.L3 - WORST.need).toFixed(1)} cm</small>`],
+    ['Toplam kol boyu (L1…L4)', `${(P.L1 + P.L2 + P.L3 + P.L4).toFixed(1)} cm`],
+  ];
+  $('#dims').innerHTML = items.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  $('#specLine').innerHTML = `<span>Kare <b>${s} cm</b></span><span>Tahta <b>${8 * s}×${8 * s} cm</b></span><span>Bölmeler <b>2 × (${zc()}×${zr()})</b></span><span>Kol <b>${P.axes} eksen + tutucu</b></span><span>Kontrol <b>Raspberry Pi 5</b></span>`;
+}
+function renderGrip() {
+  const g = WORST.grip, { dK, mAx, mDg, use } = gapCalc();
+  const fc = g.F >= g.Freq ? 'ok' : 'bad';
+  $('#grip').innerHTML = [
+    ['Tutucu servo', SERVOS[SV.G].name + ` <small>${g.tq.toFixed(1)} kg·cm @ ${P.V} V</small>`],
+    ['Parmak başına kuvvet', `<span class="${fc}">${g.F.toFixed(1)} N</span>`],
+    ['Gereken kuvvet', `${g.Freq.toFixed(2)} N <small>m·g·SF ÷ (2μ)</small>`],
+    ['Kuvvet payı', `${(g.F / g.Freq).toFixed(1)} ×`],
+    ['Kavrama çapı (şah gövdesi)', `${dK.toFixed(2)} cm`],
+    ['Çene açıklığı (açık)', `${(dK + 2 * P.openClear).toFixed(2)} cm`],
+    ['Komşu taşa boşluk, kare yönünde', `<span class="${mAx > 0.2 ? 'ok' : 'bad'}">${mAx.toFixed(2)} cm</span>`],
+    ['Komşu taşa boşluk, köşegen', `<span class="${mDg > 0.2 ? 'ok' : 'bad'}">${mDg.toFixed(2)} cm</span>`],
+    ['Bu tasarımda geçerli', `${use.toFixed(2)} cm <small>${P.axes === 5 ? 'J5 çeneyi köşegene çeviriyor' : '4 eksende çene açısı tabana bağlı'}</small>`],
+  ].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+}
+function renderPower() {
+  let run = 0, stall = 0;
+  const rows = JOINTS.filter(j => !(j.k === 'J5' && P.axes === 4)).map((j, i) => {
+    const s = SERVOS[SV[j.k]], cap = s.tq[P.V];
+    const idx = JOINTS.indexOf(j);
+    const req = j.k === 'G' ? WORST.grip.tqReq : WORST.best[idx].req;
+    const a = 0.15 + s.stall * Math.min(1, req / cap);
+    run += a; stall += s.stall;
+    return [j.name.split(' · ')[1] || j.name, `${a.toFixed(2)} A <small>durma ${s.stall} A</small>`];
+  });
+  const psu = Math.ceil(Math.max(run * 1.5, stall * 0.6));
+  $('#power').innerHTML = rows.concat([
+    ['En kötü durumda toplam', `${run.toFixed(1)} A`],
+    ['Hepsi aynı anda dursa', `${stall.toFixed(1)} A`],
+  ]).map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  $('#powerAdvice').innerHTML = `Servolar için en az <b>${P.V} V ${psu} A</b> güç kaynağı. Pi 5’i ayrı resmi 5 V 5 A USB-C adaptörden besle.`;
+}
+function renderPrec() {
+  const W = WORST, cls = W.maxErr.rss <= W.tol ? 'ok' : 'bad';
+  $('#prec').innerHTML = [
+    ['Servo konum hatası', `±${P.acc.toFixed(1)}° <small>panelde "Gerçekçilik payları"</small>`],
+    ['En kötü konum', W.maxErr.lab],
+    ['Uç sapması (olası)', `<span class="${cls}">±${W.maxErr.rss.toFixed(1)} mm</span> <small>eklem hataları birbirinden bağımsızsa</small>`],
+    ['Uç sapması (en kötü)', `±${W.maxErr.wc.toFixed(1)} mm <small>bütün hatalar aynı yöne giderse</small>`],
+    ['İzin verilen sapma', `${W.tol.toFixed(1)} mm <small>parmak boşluğu ya da şahın karede kalması, hangisi küçükse</small>`],
+    ['Riskli konum', `${W.precBad} / ${Object.keys(W.err).length}`],
+  ].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  $('#precAdvice').innerHTML = W.precBad
+    ? `Sapma kol uzunluğuyla büyür. Azaltmak için: kolu kısalt ya da tabanı tahtaya yaklaştır; ±0,5° ya da daha iyi dijital servo kullan; her eklem için açı kalibrasyon tablosu çıkar (servoya 90° gönder, gerçek açıyı ölç, farkı kodda düzelt); ya da tutucuya bakan küçük bir kamerayla son milimetreleri düzelt.`
+    : 'Bu hata payıyla bütün konumlara güvenle uzanılıyor.';
+}
+function renderPins() {
+  const js = JOINTS.filter(j => !(j.k === 'J5' && P.axes === 4));
+  const pca = P.drive === 'pca';
+  $('#piSub').textContent = pca ? 'PCA9685 servo kartı ile (I²C)' : 'sürücü kartı yok, servolar doğrudan GPIO’dan';
+  $('#codeNote').textContent = (pca ? 'Python (Adafruit ServoKit).' : 'Python (gpiozero, Pi 5’te varsayılan lgpio altyapısı).') + ' Açılar robotun şu anki duruşu.';
+  if (pca) {
+    $('#pins thead tr').innerHTML = '<th>Bağlantı</th><th>PCA9685</th><th>Raspberry Pi 5</th><th>Not</th>';
+    $('#pins tbody').innerHTML = js.map((j, i) => `<tr><td>${j.name}</td><td class="num">kanal ${i}</td><td>—</td><td>donanım PWM</td></tr>`).join('')
+      + '<tr><td>I²C veri</td><td class="num">SDA</td><td class="num">GPIO2 · pin 3</td><td></td></tr>'
+      + '<tr><td>I²C saat</td><td class="num">SCL</td><td class="num">GPIO3 · pin 5</td><td></td></tr>'
+      + '<tr><td>Kart beslemesi</td><td class="num">VCC</td><td class="num">3,3 V · pin 1</td><td>mantık devresi</td></tr>'
+      + '<tr><td>Toprak</td><td class="num">GND</td><td class="num">pin 6</td><td>ortak toprak</td></tr>'
+      + '<tr><td>Servo gücü</td><td class="num">V+</td><td>—</td><td>5–6 V güç kaynağının artısı</td></tr>';
+    $('#piRules').innerHTML = [
+      'PCA9685 16 kanallı donanım PWM üretir. Pi ona yalnızca I²C ile komut gönderir, servolar titremez.',
+      '<b>Servo gücünü kartın V+ girişine bağla, Pi’nin 5V pinine değil.</b> Kartın VCC’sini Pi’nin 3,3 V pinine bağla.',
+      'Pi’de I²C’yi aç: <code>sudo raspi-config</code> → Interface Options → I2C. Sonra <code>pip install adafruit-circuitpython-servokit</code>.',
+      'V+ girişine 470–1000 µF kondansatör koy; ani akım çekişinde gerilim düşmesini önler.',
+    ].map(x => `<li>${x}</li>`).join('');
+    return;
+  }
+  $('#pins thead tr').innerHTML = '<th>Eklem</th><th>GPIO</th><th>Fiziksel pin</th><th>PWM</th>';
+  $('#pins tbody').innerHTML = js.map(j => `<tr><td>${j.name}</td><td class="num">GPIO${j.gpio}</td><td class="num">${j.pin}</td><td>${j.pwm}</td></tr>`).join('') + `<tr><td>Servo eksi (GND)</td><td class="num">GND</td><td class="num">6, 9, 14…</td><td>ortak toprak</td></tr>`;
+  $('#piRules').innerHTML = [
+    'Servoları <b>Pi’nin 5V pinine bağlama.</b> Ayrı bir 5–6 V güç kaynağı kullan, eksi ucunu Pi’nin GND pinine (örn. pin 6) bağla.',
+    'Pi 5 GPIO sinyali 3,3 V. MG996R ve DS32xx servoların çoğu bununla çalışır. Titreme olursa 74AHCT125 gibi bir seviye dönüştürücü ekle.',
+    'GPIO 12, 13, 18 ve 19 donanım PWM destekler; en yüklü eklemler (omuz, dirsek) bu pinlerde. Diğerleri yazılım PWM ile sürülür, hafif titreyebilir. Titreme sorun olursa panelden PCA9685 seçeneğine bak.',
+    'Her büyük servonun besleme girişine 470–1000 µF kondansatör koy; ani akım çekişinde Pi’nin resetlenmesini önler.',
+  ].map(x => `<li>${x}</li>`).join('');
+}
+function renderCode(sol) {
+  const a = sol.s.map(v => clamp(v, 0, 180).toFixed(1));
+  const five = P.axes === 5;
+  if (P.drive === 'pca') {
+    const n = five ? 5 : 4;
+    $('#code').textContent =
+`from adafruit_servokit import ServoKit
+from time import sleep
+
+kit = ServoKit(channels=16)          # PCA9685, I²C adresi 0x40
+for k in range(${n + 1}):
+    kit.servo[k].set_pulse_width_range(500, 2500)   # 0,5–2,5 ms = 0–180°
+
+# kanal 0: taban, 1: omuz, 2: dirsek, 3: bilek${five ? ', 4: bilek dönüşü' : ''}, ${n}: tutucu
+def poz(*acilar):
+    for k, aci in enumerate(acilar):
+        kit.servo[k].angle = aci
+
+# Simülasyondaki anlık duruş
+poz(${a.slice(0, n).join(', ')})
+sleep(1)`;
+    return;
+  }
+  $('#code').textContent =
+`from gpiozero import AngularServo
+from time import sleep
+
+def servo(gpio):
+    # 50 Hz, 0,5–2,5 ms darbe = 0–180°
+    return AngularServo(gpio, min_angle=0, max_angle=180,
+                        min_pulse_width=0.0005, max_pulse_width=0.0025,
+                        frame_width=0.02)
+
+taban  = servo(12)   # J1  pin 32
+omuz   = servo(13)   # J2  pin 33
+dirsek = servo(18)   # J3  pin 12
+bilek  = servo(19)   # J4  pin 35
+${five ? 'donus  = servo(23)   # J5  pin 16\n' : ''}tutucu = servo(24)   # G   pin 18
+
+def poz(j1, j2, j3, j4${five ? ', j5' : ''}):
+    taban.angle, omuz.angle = j1, j2
+    dirsek.angle, bilek.angle = j3, j4
+${five ? '    donus.angle = j5\n' : ''}
+# Simülasyondaki anlık duruş
+poz(${a.slice(0, five ? 5 : 4).join(', ')})
+sleep(1)`;
+}
+
+// ---------- Yan görünüş ----------
+const side = $('#side');
+function drawSide(sol, L) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), W = side.clientWidth, H = side.clientHeight;
+  if (side.width !== W * dpr) { side.width = W * dpr; side.height = H * dpr; }
+  const g = side.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const ink = css('--ink'), muted = css('--muted'), line = css('--line'), acc = css('--accent'), bad = css('--bad'), link = css('--link'), arm = css('--arm');
+  const f = L.f, reach = P.L2 + P.L3;
+  const rmin = Math.min(-12, f.E[0] - 6), rmax = Math.max(reach, 50) + 6, zmin = -6, zmax = P.L1 + Math.max(P.L2, P.L3) + 6;
+  const sc = Math.min((W - 16) / (rmax - rmin), (H - 16) / (zmax - zmin));
+  const ox = 8 - rmin * sc, oy = H - 8 + zmin * sc;
+  const X = r => ox + r * sc, Y = z => oy - z * sc;
+  g.font = '11px "IBM Plex Mono", monospace'; g.lineWidth = 1;
+  g.strokeStyle = line; g.globalAlpha = 0.6;
+  for (let r = -10; r <= rmax; r += 5) { g.beginPath(); g.moveTo(X(r), Y(zmin)); g.lineTo(X(r), Y(zmax)); g.stroke(); }
+  for (let z = -5; z <= zmax; z += 5) { g.beginPath(); g.moveTo(X(rmin), Y(z)); g.lineTo(X(rmax), Y(z)); g.stroke(); }
+  g.globalAlpha = 1;
+  // tahtanın bu yön üzerindeki izdüşümü
+  const B = basePos(), dir = { x: Math.sin(sol.th1), y: -Math.cos(sol.th1) }, h = half();
+  let t0 = -Infinity, t1 = Infinity;
+  [['x', B.x, dir.x], ['y', B.y, dir.y]].forEach(([, o, d]) => { if (Math.abs(d) < 1e-9) { if (o < -h || o > h) { t0 = 1; t1 = 0; } } else { let a = (-h - o) / d, b = (h - o) / d; if (a > b) [a, b] = [b, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, b); } });
+  g.fillStyle = css('--sq-dark');
+  if (t1 > t0 && t1 > 0) { g.fillRect(X(Math.max(t0, 0)), Y(0), (t1 - Math.max(t0, 0)) * sc, 4); g.fillStyle = muted; g.fillText('tahta', X(Math.max(t0, 0)) + 2, Y(0) + 15); }
+  // kolun yolundaki taşlar: bu düzleme yarım kareden yakın olanlar, gerçek boy ve çaplarıyla
+  g.lineWidth = 1; g.strokeStyle = muted;
+  for (const p of state.pieces) {
+    if (p === state.held) continue;
+    const c = locPoint(p.loc), vx = c.x - B.x, vy = c.y - B.y;
+    const t = vx * dir.x + vy * dir.y, lat = Math.abs(vx * dir.y - vy * dir.x);
+    if (t <= 0 || lat > P.s / 2) continue;
+    const w = PT[p.t].d * P.s, ph = pieceH(p.t);
+    g.fillStyle = css('--surface-2'); g.fillRect(X(t - w / 2), Y(ph), w * sc, ph * sc); g.strokeRect(X(t - w / 2), Y(ph), w * sc, ph * sc);
+  }
+  // engel sınırı: kol gövdesi bunun altına inerse çarpışma sayılır
+  const zObs = pieceH('K') + 1.5;
+  if (t1 > t0 && t1 > 0) {
+    g.setLineDash([5, 4]); g.strokeStyle = css('--warn'); g.beginPath(); g.moveTo(X(Math.max(t0, 0)), Y(zObs)); g.lineTo(X(t1), Y(zObs)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = muted; g.fillText(`engel sınırı ${zObs.toFixed(2)} cm`, X(Math.max(t0, 0)) + 4, Y(zObs) - 5);
+  }
+  g.strokeStyle = muted; g.beginPath(); g.moveTo(X(rmin), Y(0)); g.lineTo(X(rmax), Y(0)); g.stroke();
+  // erişim yayı
+  g.setLineDash([4, 4]); g.strokeStyle = muted; g.beginPath(); g.arc(X(0), Y(P.L1), reach * sc, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.02); g.stroke(); g.setLineDash([]);
+  // gövde
+  g.fillStyle = arm; g.fillRect(X(-4), Y(P.L1), 8 * sc, P.L1 * sc); g.fillRect(X(-BASE_R), Y(1.6), 2 * BASE_R * sc, 1.6 * sc);
+  // taban plakasının tahta çerçevesine bindiği kısım
+  const clr = baseClear();
+  if (clr < 0) { g.fillStyle = bad; g.fillRect(X(BASE_R + clr), Y(1.6), -clr * sc, 1.6 * sc); g.font = '600 11px "IBM Plex Mono", monospace'; g.fillText(`taban tahtaya ${(-clr).toFixed(1)} cm biniyor`, X(-BASE_R), Y(0) + 29); g.font = '11px "IBM Plex Mono", monospace'; }
+  const seg = (a, b, w, c) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'round'; g.beginPath(); g.moveTo(X(a[0]), Y(a[1])); g.lineTo(X(b[0]), Y(b[1])); g.stroke(); };
+  seg(f.S, f.E, 7, link); seg(f.E, f.W, 6, link); seg(f.W, f.T, 4, arm);
+  // parmaklar
+  g.lineWidth = 1;
+  // taş
+  if (state.held) { const ph = pieceH(state.held.t), pd = PT[state.held.t].d * P.s, gz = graspZ(state.held.t); g.strokeStyle = ink; g.strokeRect(X(f.T[0] - pd / 2), Y(f.T[1] - gz + ph), pd * sc, ph * sc); }
+  [f.S, f.E, f.W].forEach(p => { g.fillStyle = css('--surface'); g.strokeStyle = ink; g.lineWidth = 2; g.beginPath(); g.arc(X(p[0]), Y(p[1]), 5, 0, 7); g.fill(); g.stroke(); });
+  // yerçekimi okları
+  g.strokeStyle = acc; g.fillStyle = acc; g.lineWidth = 2;
+  L.items.forEach(it => {
+    const len = 6 + it.m * 1000 * 0.35, x = X(it.p[0]), y = Y(it.p[1]);
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + len); g.stroke();
+    g.beginPath(); g.moveTo(x - 4, y + len - 5); g.lineTo(x, y + len); g.lineTo(x + 4, y + len - 5); g.stroke();
+  });
+  // ölçü etiketleri
+  g.font = '600 11.5px "IBM Plex Mono", monospace'; g.lineWidth = 1;
+  const lab = (t, x, y, c = ink) => { const w = g.measureText(t).width; g.fillStyle = css('--surface'); g.globalAlpha = 0.85; g.fillRect(x - 3, y - 11, w + 6, 15); g.globalAlpha = 1; g.fillStyle = c; g.fillText(t, x, y); };
+  const md = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  lab(`L1 ${P.L1.toFixed(1)}`, X(-11.5), Y(P.L1 / 2));
+  let m = md(f.S, f.E); lab(`L2 ${P.L2.toFixed(1)}`, X(m[0]) + 8, Y(m[1]) - 6);
+  m = md(f.E, f.W); lab(`L3 ${P.L3.toFixed(1)}`, X(m[0]) + 8, Y(m[1]) - 6);
+  m = md(f.W, f.T); lab(`L4 ${P.L4.toFixed(1)}`, X(m[0]) + 8, Y(m[1]) + 4);
+  g.font = '11px "IBM Plex Mono", monospace';
+  lab(`J2 ${sol.s[1].toFixed(0)}°`, X(f.S[0]) + 8, Y(f.S[1]) + 16, sol.lim[1] ? bad : muted);
+  lab(`J3 ${sol.s[2].toFixed(0)}°`, X(f.E[0]) + 8, Y(f.E[1]) + 16, sol.lim[2] ? bad : muted);
+  lab(`J4 ${sol.s[3].toFixed(0)}°`, X(f.W[0]) + 8, Y(f.W[1]) - 8, sol.lim[3] ? bad : muted);
+  // omuz yatay kaldıraç
+  const yd = Y(zmax) + 14;
+  g.strokeStyle = acc; g.beginPath(); g.moveTo(X(0), yd); g.lineTo(X(f.W[0]), yd); g.stroke();
+  [0, f.W[0]].forEach(r => { g.beginPath(); g.moveTo(X(r), yd - 4); g.lineTo(X(r), yd + 4); g.stroke(); });
+  lab(`omuz → bilek yatay ${f.W[0].toFixed(1)} cm · omuz ${L.st[1].toFixed(1)} kg·cm statik`, X(0) + 4, yd - 6, acc);
+  $('#sideSub').textContent = `yön ${(sol.th1 * R2D).toFixed(0)}°, ölçüler cm`;
+}
+
+// ---------- Hesap döngüsü ----------
+function recalc() {
+  scan();
+  WORST.need = 0;
+  // ulaşılamayan konumlar dahil gereken en büyük bilek mesafesi
+  const all = [];
+  for (let f = 0; f < 8; f++) for (let r = 0; r < 8; r++) all.push(sqCenter(f, r));
+  for (const sd of ['w', 'b']) for (let i = 0; i < nSlots(); i++) all.push(zoneCenter(sd, i));
+  for (const c of all) for (const z of [graspZ('P'), travelZ()]) WORST.need = Math.max(WORST.need, ik(c.x, c.y, z).D);
+  tintTiles(); renderTorque(); renderDims(); renderGrip(); renderPower(); renderPins(); renderPrec();
+  applyPose(true);
+}
+const jc = $('#jointChips');
+function applyPose(full) {
+  if (rosMode) return;
+  const sol = ik(state.tip.x, state.tip.y, state.tip.z);
+  updateArm(sol);
+  liveL = loads(sol, state.held ? P.pieceMass / 1000 : 0);
+  if (anim.running) liveL.req.forEach((v, i) => anim.peak[i] = Math.max(anim.peak[i], v));
+  if (anim.running && !anim.coll && collide(sol)) anim.coll = true;
+  renderLive();
+  drawSide(sol, liveL);
+  const names = ['J1', 'J2', 'J3', 'J4', 'J5'];
+  jc.innerHTML = names.map((n, i) => (i === 4 && P.axes === 4) ? '' : `<span class="chip${sol.lim[i] ? ' lim' : ''}">${n} ${sol.s[i].toFixed(1)}°</span>`).join('') + `<span class="chip">uç z ${state.tip.z.toFixed(1)} cm</span>`;
+  if (full || !anim.running) renderCode(sol);
+  dirty = true;
+}
+
+// ---------- Tema ----------
+function applyTheme() {
+  scene.background = col('--stage');
+  M.pw.color = col('--piece-w'); M.pb.color = col('--piece-b'); M.arm.color = col('--arm'); M.link.color = col('--link');
+  M.servo.color = col('--piece-b'); M.frame.color = col('--frame'); M.table.color = col('--table'); M.zoneTray.color = col('--frame');
+  M.accent.color = col('--accent'); M.selRing.color = col('--accent'); M.hovRing.color = col('--ink');
+  buildBoard();
+  if (state.tip) applyPose(true);
+  dirty = true;
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- Düğmeler ----------
+$('#styleSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.dataset.v === STYLE) return;
+  STYLE = b.dataset.v; document.documentElement.dataset.style = STYLE;
+  $('#styleSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  // pembe tasarımın kalın PLA gövdeleri alüminyum plakalardan ağır
+  setParam('linkMass', STYLE === 'pink' ? 6 : 2.5); setParam('gripMass', STYLE === 'pink' ? 60 : 35);
+  applyTheme(); buildArm(); recalc();
+  setStatus(STYLE === 'pink' ? 'Pembe tasarım: kol kütlesi 6 g/cm, tutucu 60 g olarak güncellendi' : 'Alüminyum tasarım: kol kütlesi 2,5 g/cm, tutucu 35 g');
+});
+$('#btnPlay').addEventListener('click', () => doMove($('#moveInput').value));
+$('#moveInput').addEventListener('keydown', e => { if (e.key === 'Enter') doMove(e.target.value); });
+$('#btnHome').addEventListener('click', goHome);
+$('#btnReset').addEventListener('click', () => { stopAnim(); demoActive = false; initPieces(); resetGame(); state.tip = homeTip(); state.gap = 3; setStatus('Yeni oyun · sıra beyazda'); applyPose(true); });
+$('#btnDemo').addEventListener('click', () => {
+  if (anim.running) return;
+  stopAnim(); initPieces(); resetGame(); state.tip = homeTip(); applyPose(true);
+  // kural dışı kısayollar içerir (a2a7): yeme, rok ve terfiyi kısa sürede göstermek için
+  demoActive = true;
+  demoQ = ['e2e4', 'd7d5', 'e4d5', 'd8d5', 'g1f3', 'a7a5', 'f1e2', 'b8c6', 'e1g1', 'h7h6', 'b2b4', 'a5b4', 'a2a7', 'b4b3', 'a7b8q'];
+  const n = demoQ.shift(); $('#moveInput').value = n; doMove(n, { bypass: true });
+});
+$('#btnCopy').addEventListener('click', e => {
+  const t = $('#code').textContent, b = e.currentTarget;
+  navigator.clipboard.writeText(t).then(() => { b.textContent = 'Kopyalandı'; setTimeout(() => b.textContent = 'Kopyala', 1400); })
+    .catch(() => { const r = document.createRange(); r.selectNodeContents($('#code')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = 'Seçildi, Ctrl+C'; });
+});
+window.addEventListener('resize', () => applyPose(true));
+
+// The live adapter never invokes the browser chess engine or motion animation.
+window.SatrancROS = {
+  status(text) { setStatus(text); },
+  enter() { rosMode = true; stopAnim(); demoActive = false; state.held = null; },
+  leave() { rosMode = false; initPieces(); resetGame(); state.tip = homeTip(); state.gap = 3; applyPose(true); },
+  configure(robot) {
+    stopAnim(); state.held = null;
+    STYLE = robot.style;
+    document.documentElement.dataset.style = STYLE;
+    $('#styleSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === STYLE));
+    const g = robot.geometry;
+    const map = {s:'s', base_gap:'baseGap', zone_gap:'zGap', L1:'L1', L2:'L2', L3:'L3', L4:'L4', clearance:'clear'};
+    for (const [k, v] of Object.entries(map)) setParam(v, g[k] * 100);
+    setParam('tilt', g.tilt_deg); setParam('graspFrac', g.grasp_frac * 100);
+    setParam('axes', 5); P.zl = '4x4';
+    setParam('linkMass', STYLE === 'pink' ? 6 : 2.5);
+    setParam('gripMass', STYLE === 'pink' ? 60 : 35);
+    buildArm(); buildBoard(); recalc();
+  },
+  board(robot) {
+    // FEN and trays are logical state confirmed by the executor, not measured piece poses.
+    state.pieces.forEach(p => { if(p.mesh) scene.remove(p.mesh); });
+    state.board = {}; state.zone = {w:Array(nSlots()).fill(null), b:Array(nSlots()).fill(null)};
+    state.pieces = []; state.held = null;
+    const add = (t, c, loc) => {
+      const p = {id:pid++, t, c, loc:null, mesh:null}; state.pieces.push(p); setLoc(p,loc); makePieceMesh(p);
+    };
+    robot.fen.split(' ')[0].split('/').forEach((rank, ri) => {
+      let file = 0;
+      for(const c of rank) {
+        if(/[1-8]/.test(c)) { file += Number(c); continue; }
+        add(c.toUpperCase(), c === c.toUpperCase() ? 'w':'b', {kind:'sq', key:FILES[file++] + (8-ri)});
+      }
+    });
+    for(const color of ['w','b']) (robot.zone[color] || []).forEach((t,idx) => {
+      if(t) add(t,color,{kind:'zone',side:color,idx});
+    });
+    game.turn = robot.fen.split(' ')[1];
+    $('#history').textContent = 'ROS mantıksal tahta durumu · taşların Gazebo içindeki kayması veya düşmesi bu görünümde ölçülmez.';
+    dirty = true;
+  },
+  joints(q) {
+    const th1=q.joint1, th2=q.joint2, ph3=th2+q.joint3, ph4=ph3+q.joint4;
+    const s=[90+th1*R2D,th2*R2D,-q.joint3*R2D,180+q.joint4*R2D,90+q.joint5*R2D];
+    const sol={th1,th2,ph3,ph4,psi:q.joint5,s,lim:s.map(x=>x<0||x>180),reach:true};
+    state.gap=(q.finger_left_joint+q.finger_right_joint)*100;
+    state.tip=toWorld(sol,fkPlane(sol).T);
+    updateArm(sol); liveL=loads(sol,P.pieceMass/1000); renderLive(); drawSide(sol,liveL);
+    jc.textContent=s.map((v,i)=>`J${i+1} ${v.toFixed(1)}°`).join(' · ')+' · ROS eklem verisi';
+    dirty=true;
+  }
+};
+
+// ---------- Başlat ----------
+HIST0 = $('#history').innerHTML;
+buildPanel(); buildTorqueTable(); bindCustomServo();
+document.documentElement.dataset.style = STYLE;
+$('#styleSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === STYLE));
+if (STYLE === 'pink') { setParam('linkMass', 6); setParam('gripMass', 60); }
+state.tip = homeTip();
+scan(); WORST.need = 0;
+buildArm(); applyTheme();
+initPieces();
+recalc(); updCam(); resize();
+let last = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (anim.running) { step(dt); applyPose(false); }
+  if (dirty) { renderer.render(scene, camera); dirty = false; }
+}
+function loop(now) { tick(now); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+// Sayfa görünmezken (gizli sekme, ekran dışındaki gömülü kutu) tarayıcı kare çizmeyi durdurur; hamle yine de tamamlansın
+setInterval(() => { const now = performance.now(); if (anim.running && now - last > 250) tick(now); }, 60);
+})();
+</script>
+<script src="ros-client.js"></script>
+<section id="sistem" class="wrap" style="padding-top:32px;padding-bottom:45px">
+<h2>Web arayüzünden fizik simülasyonuna</h2>
+<p>Hamle girişi → ROS 2 hamle yürütücü → eklem denetleyicileri → Gazebo. Kolun eklem açıları ROS'tan web arayüzüne geri gelir. İnsan hamlesi tamamlandıktan sonra Stockfish karşı hamleyi seçer.</p>
+<p><strong>İki çalışma modu:</strong> Tasarım modunda bu sayfa bağımsız bir tarayıcı simülatörüdür. ROS'a bağlandıktan sonra kol ROS eklem verisini izler; bağlantı kesildiğinde görüntü donar ve hamle gönderimi kapanır.</p>
+<p><strong>Canlı sunum:</strong> Sunum bilgisayarında ROS ve Gazebo açık olmalıdır. Paylaşılan canlı bağlantıyı açın, sunum anahtarını girin ve ROS'a bağlan'a basın. Anahtar sayfada saklanmaz. Başlangıca dön düğmesi sunum yöneticisiyle açılmış ROS/Gazebo oturumunu yeniden başlatır.</p>
+<p><strong>Model:</strong> 5 eksen ve paralel tutucu · 5 cm kareli 40×40 cm tahta · iki adet 4×4 yan bölme · L1/L2/L3/L4: 10/24/30/14 cm. Pembe ve alüminyum görünümleri desteklenir; bağlı model ROS oturumundan seçilir.</p>
+<p><strong>Test sınırları:</strong> Önceki Gazebo testlerinde e2e4 ve e7e5 taşındı; merkezden yaklaşık 6–14 mm sapma raporlandı. Eklemler konum denetimindedir. Tork değerleri model hesabıdır; gerçek motor performansı ve taşların fiziksel konumu ayrıca doğrulanmalıdır. Teknik rehber ilk testleri açıklar.</p>
+</section>
+</body>
+</html>
