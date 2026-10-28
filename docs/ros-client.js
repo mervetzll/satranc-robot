@@ -16,7 +16,8 @@
   document.querySelector('header.top').after(panel);
   const $ = id => document.getElementById(id);
   const url = $('rosUrl'), status = $('rosStatus'), connect = $('rosConnect'), leave = $('rosLeave');
-  url.value = /^https?:$/.test(location.protocol) ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws` : 'ws://127.0.0.1:8080/ws';
+  url.value = ['localhost','127.0.0.1','[::1]'].includes(location.hostname) ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws` : (location.protocol === 'file:' ? 'ws://127.0.0.1:8080/ws' : '');
+  url.placeholder = 'Canlı sunum bağlantısındaki wss:// adresi';
   const sharedEndpoint = new URLSearchParams(location.hash.slice(1)).get('endpoint');
   if(sharedEndpoint) { try { const u=new URL(sharedEndpoint); if(u.protocol==='wss:') url.value=u.href; } catch {} }
   let ws = null, remote = false, packet = null, lastAt = 0, session = null, lastBoard = null, pending = false;
