@@ -1,0 +1,295 @@
+<?xml version="1.0"?>
+<!--
+  Satranç robotu: 5 eksenli servo kol + paralel tutucu.
+  Ölçüler tarayıcı simülatörünün önerilen varsayılanlarıyla aynıdır (metre, kg).
+  Eklem sınırları servoların 0–180° aralığından, tork sınırları katalog durma torklarından gelir
+  (1 kg·cm = 0,0980665 N·m).
+  sim:=gz   → Gazebo fizik simülasyonu (gz_ros2_control)
+  sim:=mock → gerçek robot / RViz (mock_components; servo_driver düğümü servoları sürer)
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="satranc_robotu">
+  <xacro:arg name="sim" default="gz"/>
+  <xacro:property name="sim" value="$(arg sim)"/>
+
+  <xacro:property name="PI" value="3.14159265"/>
+  <xacro:property name="L1" value="0.10"/>
+  <xacro:property name="L2" value="0.24"/>
+  <xacro:property name="L3" value="0.30"/>
+  <xacro:property name="L4" value="0.14"/>
+  <xacro:property name="base_r" value="0.085"/>
+  <xacro:property name="base_h" value="0.014"/>
+  <xacro:property name="link_kg_m" value="0.31"/>   <!-- 2,5 g/cm kol + 0,6 g/cm kablo -->
+  <xacro:property name="m_elbow_servo" value="0.060"/>  <!-- DS3218 -->
+  <xacro:property name="m_wrist_servo" value="0.055"/>  <!-- MG996R -->
+  <xacro:property name="m_roll_servo" value="0.0134"/>  <!-- MG90S -->
+  <xacro:property name="m_gripper" value="0.0484"/>     <!-- 35 g gövde + MG90S -->
+  <xacro:property name="wrist_len" value="0.042"/>      <!-- bilek ekseni → dönüş ekseni -->
+  <xacro:property name="tcp" value="${L4 - wrist_len}"/> <!-- dönüş ekseni → parmak ucu -->
+
+  <!-- Eklem tork sınırları, N·m (6 V durma torku) -->
+  <xacro:property name="eff_j1" value="1.08"/>   <!-- MG996R 11 kg·cm -->
+  <xacro:property name="eff_j2" value="3.14"/>   <!-- DS3235 32 kg·cm -->
+  <xacro:property name="eff_j3" value="2.01"/>   <!-- DS3218 20,5 kg·cm -->
+  <xacro:property name="eff_j4" value="1.08"/>   <!-- MG996R -->
+  <xacro:property name="eff_j5" value="0.216"/>  <!-- MG90S 2,2 kg·cm -->
+
+  <xacro:macro name="box_inertial" params="m x y z ox">
+    <inertial>
+      <origin xyz="${ox} 0 0"/>
+      <mass value="${m}"/>
+      <inertia ixx="${m*(y*y+z*z)/12}" ixy="0" ixz="0" iyy="${m*(x*x+z*z)/12}" iyz="0" izz="${m*(x*x+y*y)/12}"/>
+    </inertial>
+  </xacro:macro>
+
+  <material name="govde"><color rgba="0.20 0.23 0.27 1"/></material>
+  <material name="aluminyum"><color rgba="0.80 0.83 0.86 1"/></material>
+  <material name="servo"><color rgba="0.08 0.09 0.10 1"/></material>
+  <material name="turuncu"><color rgba="0.85 0.40 0.10 1"/></material>
+
+  <!-- Masaya sabit taban -->
+  <link name="world"/>
+  <joint name="world_fixed" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 ${base_h/2}"/>
+      <geometry><cylinder radius="${base_r}" length="${base_h}"/></geometry>
+      <material name="govde"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${base_h/2}"/>
+      <geometry><cylinder radius="${base_r}" length="${base_h}"/></geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 ${base_h/2}"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.0036"/>
+    </inertial>
+  </link>
+
+  <!-- J1 taban dönüşü -->
+  <joint name="joint1" type="revolute">
+    <parent link="base_link"/>
+    <child link="turntable"/>
+    <origin xyz="0 0 ${base_h}"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${-PI/2}" upper="${PI/2}" effort="${eff_j1}" velocity="7.48"/>
+    <dynamics damping="0.05" friction="0.01"/>
+  </joint>
+
+  <link name="turntable">
+    <visual>
+      <origin xyz="0 0 0.005"/>
+      <geometry><cylinder radius="0.072" length="0.01"/></geometry>
+      <material name="govde"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0 ${(L1 - base_h)/2}"/>
+      <geometry><cylinder radius="0.04" length="${L1 - base_h - 0.02}"/></geometry>
+      <material name="govde"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${(L1 - base_h)/2}"/>
+      <geometry><cylinder radius="0.04" length="${L1 - base_h - 0.02}"/></geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0.03"/>
+      <mass value="0.25"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+  </link>
+
+  <!-- J2 omuz: yataydan yukarı pozitif -->
+  <joint name="joint2" type="revolute">
+    <parent link="turntable"/>
+    <child link="upper_arm"/>
+    <origin xyz="0 0 ${L1 - base_h}"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0" upper="${PI}" effort="${eff_j2}" velocity="6.98"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+
+  <link name="upper_arm">
+    <visual>
+      <origin xyz="${L2/2} 0 0"/>
+      <geometry><box size="${L2} 0.051 0.036"/></geometry>
+      <material name="aluminyum"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+      <geometry><cylinder radius="0.021" length="0.046"/></geometry>
+      <material name="servo"/>
+    </visual>
+    <collision>
+      <origin xyz="${L2/2} 0 0"/>
+      <geometry><box size="${L2} 0.051 0.036"/></geometry>
+    </collision>
+    <xacro:box_inertial m="${link_kg_m*L2 + m_elbow_servo}" x="${L2}" y="0.05" z="0.036"
+      ox="${(link_kg_m*L2*L2/2 + m_elbow_servo*L2)/(link_kg_m*L2 + m_elbow_servo)}"/>
+  </link>
+
+  <!-- J3 dirsek: üst kola göre, aşağı negatif -->
+  <joint name="joint3" type="revolute">
+    <parent link="upper_arm"/>
+    <child link="forearm"/>
+    <origin xyz="${L2} 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="${-PI}" upper="0" effort="${eff_j3}" velocity="7.48"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+
+  <link name="forearm">
+    <visual>
+      <origin xyz="${L3/2} 0 0"/>
+      <geometry><box size="${L3} 0.041 0.030"/></geometry>
+      <material name="aluminyum"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0" rpy="${PI/2} 0 0"/>
+      <geometry><cylinder radius="0.019" length="0.042"/></geometry>
+      <material name="servo"/>
+    </visual>
+    <collision>
+      <origin xyz="${L3/2} 0 0"/>
+      <geometry><box size="${L3} 0.041 0.030"/></geometry>
+    </collision>
+    <xacro:box_inertial m="${link_kg_m*L3 + m_wrist_servo}" x="${L3}" y="0.04" z="0.03"
+      ox="${(link_kg_m*L3*L3/2 + m_wrist_servo*L3)/(link_kg_m*L3 + m_wrist_servo)}"/>
+  </link>
+
+  <!-- J4 bilek eğimi: ön kola göre -->
+  <joint name="joint4" type="revolute">
+    <parent link="forearm"/>
+    <child link="wrist"/>
+    <origin xyz="${L3} 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="${-PI}" upper="0" effort="${eff_j4}" velocity="7.48"/>
+    <dynamics damping="0.03" friction="0.01"/>
+  </joint>
+
+  <link name="wrist">
+    <visual>
+      <origin xyz="${wrist_len/2} 0 0"/>
+      <geometry><box size="${wrist_len} 0.032 0.026"/></geometry>
+      <material name="servo"/>
+    </visual>
+    <collision>
+      <origin xyz="${wrist_len/2} 0 0"/>
+      <geometry><box size="${wrist_len} 0.032 0.026"/></geometry>
+    </collision>
+    <xacro:box_inertial m="${m_roll_servo}" x="${wrist_len}" y="0.03" z="0.026" ox="${wrist_len/2}"/>
+  </link>
+
+  <!-- J5 bilek dönüşü: tutucu ekseni etrafında -->
+  <joint name="joint5" type="revolute">
+    <parent link="wrist"/>
+    <child link="gripper"/>
+    <origin xyz="${wrist_len} 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="${-PI/2}" upper="${PI/2}" effort="${eff_j5}" velocity="13.1"/>
+    <dynamics damping="0.01" friction="0.005"/>
+  </joint>
+
+  <link name="gripper">
+    <visual>
+      <origin xyz="0.03 0 0"/>
+      <geometry><box size="0.006 0.066 0.026"/></geometry>
+      <material name="aluminyum"/>
+    </visual>
+    <visual>
+      <origin xyz="0.012 0 0.02"/>
+      <geometry><box size="0.026 0.032 0.016"/></geometry>
+      <material name="servo"/>
+    </visual>
+    <collision>
+      <origin xyz="0.03 0 0"/>
+      <geometry><box size="0.006 0.066 0.026"/></geometry>
+    </collision>
+    <xacro:box_inertial m="${m_gripper}" x="0.04" y="0.066" z="0.026" ox="0.02"/>
+  </link>
+
+  <!-- Paralel parmaklar: eklem değeri = merkezden parmağın iç yüzüne uzaklık -->
+  <xacro:macro name="finger" params="side sign">
+    <joint name="finger_${side}_joint" type="prismatic">
+      <parent link="gripper"/>
+      <child link="finger_${side}"/>
+      <origin xyz="${0.035 + (tcp - 0.035)/2} 0 0"/>
+      <axis xyz="0 ${sign} 0"/>
+      <limit lower="0.006" upper="0.025" effort="8.6" velocity="0.05"/>
+      <dynamics damping="0.5" friction="0.1"/>
+    </joint>
+    <link name="finger_${side}">
+      <visual>
+        <origin xyz="0 ${sign*0.003} 0"/>
+        <geometry><box size="${tcp - 0.035} 0.006 0.022"/></geometry>
+        <material name="turuncu"/>
+      </visual>
+      <collision>
+        <origin xyz="0 ${sign*0.003} 0"/>
+        <geometry><box size="${tcp - 0.035} 0.006 0.022"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.005"/>
+        <inertia ixx="2e-7" ixy="0" ixz="0" iyy="2e-6" iyz="0" izz="2e-6"/>
+      </inertial>
+    </link>
+    <gazebo reference="finger_${side}">
+      <mu1>2.0</mu1>
+      <mu2>2.0</mu2>
+      <kp>100000</kp>
+      <kd>10</kd>
+      <minDepth>0.0005</minDepth>
+    </gazebo>
+  </xacro:macro>
+  <xacro:finger side="left" sign="1"/>
+  <xacro:finger side="right" sign="-1"/>
+
+  <!-- Parmak ucu (ters kinematiğin hedeflediği nokta) -->
+  <link name="tcp"/>
+  <joint name="tcp_fixed" type="fixed">
+    <parent link="gripper"/>
+    <child link="tcp"/>
+    <origin xyz="${tcp} 0 0"/>
+  </joint>
+
+  <!-- ros2_control: başlangıç değerleri = ev duruşu (servo 90° / 96,3° / 102,1° / 115,8° / 45°) -->
+  <xacro:macro name="ctrl_joint" params="name lo hi init">
+    <joint name="${name}">
+      <command_interface name="position">
+        <param name="min">${lo}</param>
+        <param name="max">${hi}</param>
+      </command_interface>
+      <state_interface name="position"><param name="initial_value">${init}</param></state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <ros2_control name="SatrancRobotu" type="system">
+    <hardware>
+      <xacro:if value="${sim == 'gz'}">
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      </xacro:if>
+      <xacro:unless value="${sim == 'gz'}">
+        <plugin>mock_components/GenericSystem</plugin>
+      </xacro:unless>
+    </hardware>
+    <xacro:ctrl_joint name="joint1" lo="${-PI/2}" hi="${PI/2}" init="0.0"/>
+    <xacro:ctrl_joint name="joint2" lo="0" hi="${PI}" init="1.681"/>
+    <xacro:ctrl_joint name="joint3" lo="${-PI}" hi="0" init="-1.782"/>
+    <xacro:ctrl_joint name="joint4" lo="${-PI}" hi="0" init="-1.121"/>
+    <xacro:ctrl_joint name="joint5" lo="${-PI/2}" hi="${PI/2}" init="-0.785"/>
+    <xacro:ctrl_joint name="finger_left_joint" lo="0.006" hi="0.025" init="0.02"/>
+    <xacro:ctrl_joint name="finger_right_joint" lo="0.006" hi="0.025" init="0.02"/>
+  </ros2_control>
+
+  <xacro:if value="${sim == 'gz'}">
+    <gazebo>
+      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>$(find satranc_robotu)/config/controllers.yaml</parameters>
+      </plugin>
+    </gazebo>
+  </xacro:if>
+</robot>
