@@ -8,6 +8,7 @@ Raspberry Pi 5 üzerinde çalışacak kontrol yazılımı.
 | [`web/`](web/) | Tarayıcıda çalışan tasarım simülatörü (alüminyum ve pembe tasarım, tek dosya) |
 | [`ros2_ws/src/satranc_robotu/`](ros2_ws/src/satranc_robotu/) | ROS 2 paketi: URDF modeli, Gazebo dünyası, ters kinematik, hamle yürütücü, Stockfish, servo sürücü |
 | [`scripts/`](scripts/) | Ubuntu (WSL2) kurulum, derleme, başlatma ve hamle gönderme betikleri |
+| [`docs/`](docs/) | [Proje rehberi (PDF)](docs/satranc-robotu-rehber.pdf): tasarım, formüller, ROS 2 yapısı, test sonuçları, soru-cevap |
 
 ## Tasarım değerleri
 
