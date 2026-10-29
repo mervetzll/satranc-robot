@@ -22,6 +22,8 @@ class ChessEngine(Node):
         self.think = self.get_parameter('think_time').value
         self.robot_white = self.get_parameter('robot_color').value == 'white'
         self.board = chess.Board()
+        self.pending_human = None
+        self.early_human_done = None
         self.engine = None
         path = self.get_parameter('stockfish_path').value
         try:
@@ -31,6 +33,7 @@ class ChessEngine(Node):
             self.get_logger().warn('Stockfish bulunamadı; robot rastgele yasal hamle oynayacak. Kurulum: sudo apt install stockfish')
         self.move_pub = self.create_publisher(String, '/chess_move', 10)
         self.create_subscription(String, '/human_move', self.on_human, 10)
+        self.create_subscription(String, '/move_done', self.on_done, 10)
         if self.robot_white:
             self.create_timer(2.0, self.first_move)
 
@@ -40,6 +43,9 @@ class ChessEngine(Node):
         self.robot_move()
 
     def on_human(self, msg):
+        if self.pending_human or self.board.turn == self.robot_white:
+            self.get_logger().warn('Robotun sırası veya hareket devam ediyor')
+            return
         try:
             move = chess.Move.from_uci(msg.data.strip())
         except ValueError:
@@ -49,6 +55,24 @@ class ChessEngine(Node):
             self.get_logger().error(f'Kurala aykırı hamle: {msg.data}')
             return
         self.board.push(move)
+        self.pending_human = move.uci()
+        if self.early_human_done == self.pending_human:
+            self.early_human_done = None
+            self.on_done(msg)
+
+    def on_done(self, msg):
+        if msg.data != self.pending_human:
+            # Separate topics have no cross-topic delivery order guarantee. This
+            # can occur when a human physically moves the piece (real launch).
+            if self.pending_human is None and self.board.turn != self.robot_white:
+                try:
+                    move = chess.Move.from_uci(msg.data)
+                    if move in self.board.legal_moves:
+                        self.early_human_done = msg.data
+                except ValueError:
+                    pass
+            return
+        self.pending_human = None
         if not self.report_end():
             self.robot_move()
 

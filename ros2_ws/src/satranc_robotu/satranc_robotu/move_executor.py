@@ -8,7 +8,9 @@ bilir; yenen taşları ve yedek vezirleri tahtanın yanındaki bölmelerde tutar
 '/human_move' konusu da dinlenir: execute_human_moves=True ise (simülasyon) robot insanın
 hamlesini de oynar, False ise (gerçek tahta) yalnızca kendi tahta durumunu günceller.
 """
+import json
 import math
+import time
 import queue
 import threading
 
@@ -18,6 +20,8 @@ from builtin_interfaces.msg import Duration
 from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.clock import Clock, ClockType
+from rclpy.qos import QoSProfile, DurabilityPolicy
 from std_msgs.msg import String
 from trajectory_msgs.msg import JointTrajectoryPoint
 
@@ -39,6 +43,7 @@ class MoveExecutor(Node):
             self.declare_parameter(name, default)
             setattr(g, name, self.get_parameter(name).value)
         self.g = g
+        self.declare_parameter('style', 'alu')
         self.declare_parameter('speed', 0.10)              # parmak ucu hızı, m/s
         self.declare_parameter('points_per_segment', 12)   # bir hareketteki ara nokta sayısı
         self.declare_parameter('execute_human_moves', True)
@@ -52,6 +57,7 @@ class MoveExecutor(Node):
         self.arm = ActionClient(self, FollowJointTrajectory, '/arm_controller/follow_joint_trajectory')
         self.grip = ActionClient(self, FollowJointTrajectory, '/gripper_controller/follow_joint_trajectory')
         self.status_pub = self.create_publisher(String, '/robot_status', 10)
+        self.events_pub = self.create_publisher(String, '/robot_state', QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.done_pub = self.create_publisher(String, '/move_done', 10)
         self.create_subscription(String, '/chess_move', lambda m: self.on_move(m.data, execute=True), 10)
         self.create_subscription(String, '/human_move', lambda m: self.on_move(m.data, execute=self.exec_human), 10)
@@ -62,7 +68,26 @@ class MoveExecutor(Node):
         self.tip = g.home_xyz()
         self.last_j = None
         self.jobs = queue.Queue()
+        self.confirmed_board = chess.Board()
+        self.report_lock = threading.RLock()
+        self.report = {'ready': False, 'busy': True, 'error': None, 'uci': None,
+                       'session': str(time.time_ns()), 'style': self.get_parameter('style').value,
+                       'fen': self.confirmed_board.fen(), 'zone': self.zone,
+                       'geometry': vars(g)}
+        self.publish_state()
+        # Monitoring must continue even when simulation time is paused or absent.
+        self.status_clock = Clock(clock_type=ClockType.STEADY_TIME)
+        self.create_timer(0.5, self.publish_state, clock=self.status_clock)
         threading.Thread(target=self.worker, daemon=True).start()
+
+    def publish_state(self):
+        with self.report_lock:
+            self.events_pub.publish(String(data=json.dumps(self.report)))
+
+    def report_state(self, **changes):
+        with self.report_lock:
+            self.report.update(changes)
+            self.publish_state()
 
     # ---------- planlama ----------
     def say(self, text, level='info'):
@@ -81,6 +106,9 @@ class MoveExecutor(Node):
         return None
 
     def on_move(self, uci, execute):
+        if self.report['error']:
+            self.say('Hata sonrası yeniden başlatma gerekli', 'error')
+            return
         try:
             move = chess.Move.from_uci(uci.strip())
         except ValueError:
@@ -91,6 +119,9 @@ class MoveExecutor(Node):
             return
         if not execute:
             self.board.push(move)
+            self.confirmed_board.push(move)
+            self.report_state(fen=self.confirmed_board.fen())
+            self.done_pub.publish(String(data=uci.strip()))
             self.say(f'{uci} tahtada yapıldı (robot dokunmadı)')
             return
         plan = self.plan(move)
@@ -99,7 +130,8 @@ class MoveExecutor(Node):
         transfers, new_zone = plan
         self.board.push(move)
         self.zone = new_zone
-        self.jobs.put((uci, transfers))
+        self.report_state(busy=True)
+        self.jobs.put((uci.strip(), transfers, new_zone))
 
     def plan(self, move):
         """Hamleyi (taş türü, nereden, nereye) taşıma listesine çevirir. Durumu değiştirmez."""
@@ -121,6 +153,7 @@ class MoveExecutor(Node):
             i = self.free_slot(zone, side)
             if i is None:
                 self.say('Bölme dolu, yenen taşa yer yok', 'error')
+                self.report_state(error='Bölme dolu, yenen taşa yer yok', ready=False, busy=False)
                 return None
             zone[side][i] = cap.symbol().upper()
             out.append((cap.symbol().upper(), ('sq', chess.square_name(cap_sq)), ('zone', side, i)))
@@ -129,11 +162,13 @@ class MoveExecutor(Node):
             j = next((k for k, v in enumerate(zone[color]) if v == pt), None)
             if j is None:
                 self.say(f'Bölmede yedek {pt} yok', 'error')
+                self.report_state(error=f'Bölmede yedek {pt} yok', ready=False, busy=False)
                 return None
             zone[color][j] = None
             i = self.free_slot(zone, color)
             if i is None:
                 self.say('Bölme dolu, piyona yer yok', 'error')
+                self.report_state(error='Bölme dolu, piyona yer yok', ready=False, busy=False)
                 return None
             zone[color][i] = 'P'
             out.append(('P', ('sq', frm), ('zone', color, i)))
@@ -154,15 +189,29 @@ class MoveExecutor(Node):
         self.arm.wait_for_server()
         self.grip.wait_for_server()
         self.say('Denetleyiciler hazır, eve gidiliyor')
-        self.move_to(self.g.home_xyz(), 'cyl')
+        if not self.move_to(self.g.home_xyz(), 'cyl'):
+            self.report_state(error='Başlangıç konumuna gidilemedi', ready=False)
+            return
+        self.report_state(ready=True, busy=not self.jobs.empty())
         while rclpy.ok():
-            uci, transfers = self.jobs.get()
+            uci, transfers, new_zone = self.jobs.get()
+            self.report_state(busy=True, uci=uci)
             ok = True
             for t, a, b in transfers:
-                ok = self.pick_place(t, a, b) and ok
-            ok = self.move_to(self.g.home_xyz(), 'cyl') and ok
+                if not self.pick_place(t, a, b):
+                    ok = False
+                    break
+            if ok:
+                ok = self.move_to(self.g.home_xyz(), 'cyl')
+            if not ok:
+                self.say(f'{uci} sırasında hata oldu; yeniden başlatma gerekli', 'error')
+                self.report_state(error=f'{uci}: hareket başarısız', ready=False, busy=False)
+                return
+            self.confirmed_board.push_uci(uci)
+            self.report_state(fen=self.confirmed_board.fen(), zone=new_zone,
+                              busy=not self.jobs.empty(), uci=uci)
             self.done_pub.publish(String(data=uci))
-            self.say(f'{uci} tamamlandı' if ok else f'{uci} sırasında hata oldu', 'info' if ok else 'error')
+            self.say(f'{uci} tamamlandı')
 
     def pick_place(self, t, a, b):
         g = self.g
@@ -236,15 +285,28 @@ class MoveExecutor(Node):
             pt.positions = [float(v) for v in pos]
             pt.time_from_start = _duration(total * (i + 1) / len(positions))
             goal.trajectory.points.append(pt)
-        done, result = threading.Event(), {'ok': False}
+        done, result = threading.Event(), {'ok': False, 'expired': False, 'handle': None}
 
         def on_result(fut):
-            res = fut.result().result
+            try:
+                res = fut.result().result
+            except Exception:
+                done.set()
+                return
             result['ok'] = res.error_code == FollowJointTrajectory.Result.SUCCESSFUL
             done.set()
 
         def on_goal(fut):
-            handle = fut.result()
+            try:
+                handle = fut.result()
+            except Exception:
+                done.set()
+                return
+            result['handle'] = handle
+            if result['expired'] and handle.accepted:
+                handle.cancel_goal_async()
+                done.set()
+                return
             if not handle.accepted:
                 done.set()
                 return
@@ -252,6 +314,9 @@ class MoveExecutor(Node):
 
         client.send_goal_async(goal).add_done_callback(on_goal)
         if not done.wait(timeout=total * self.timeout_scale + 30.0):
+            result['expired'] = True
+            if result['handle'] is not None:
+                result['handle'].cancel_goal_async()
             self.say('Denetleyici zamanında cevap vermedi', 'error')
             return False
         return result['ok']
