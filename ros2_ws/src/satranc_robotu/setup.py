@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'move_executor = satranc_robotu.move_executor:main',
             'chess_engine = satranc_robotu.chess_engine_node:main',
+            'web_gateway = satranc_robotu.web_gateway:main',
             'servo_driver = satranc_robotu.servo_driver_node:main',
         ],
     },
