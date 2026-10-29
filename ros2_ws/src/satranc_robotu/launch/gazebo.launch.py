@@ -6,6 +6,9 @@ Hamle yapma: ros2 topic pub --once -w 2 /human_move std_msgs/String "{data: e2e4
 import math
 
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch.actions import IncludeLaunchDescription, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -22,7 +25,7 @@ def generate_launch_description():
     g = Geometry()
     pkg = FindPackageShare('satranc_robotu')
     xacro_file = PathJoinSubstitution([pkg, 'urdf', 'satranc_robotu.urdf.xacro'])
-    robot_description = ParameterValue(Command(['xacro ', xacro_file, ' sim:=gz']), value_type=str)
+    robot_description = ParameterValue(Command(['xacro ', xacro_file, ' sim:=gz style:=', LaunchConfiguration('style')]), value_type=str)
     sim_time = {'use_sim_time': True}
 
     gazebo = IncludeLaunchDescription(
@@ -50,20 +53,26 @@ def generate_launch_description():
 
     # Denetleyici ayarları (eklem listeleri) spawner'a ayrıca verilmeli; yoksa 'joints' boş kalır
     controllers_yaml = PathJoinSubstitution([pkg, 'config', 'controllers.yaml'])
-    spawner = lambda name: Node(package='controller_manager', executable='spawner',
-                                arguments=[name, '--param-file', controllers_yaml], parameters=[sim_time], output='screen')
+    # One spawner loads/activates the controllers in order. ROS_HOME is isolated
+    # by the presentation runner because ros2_control uses a ROS_HOME-wide lock.
+    spawn_controllers = Node(
+        package='controller_manager', executable='spawner', output='screen',
+        arguments=['joint_state_broadcaster', 'arm_controller', 'gripper_controller',
+                   '--param-file', controllers_yaml,
+                   '--controller-manager-timeout', '60',
+                   '--service-call-timeout', '60', '--switch-timeout', '60'],
+        parameters=[sim_time])
     controllers = RegisterEventHandler(OnProcessExit(
-        target_action=spawn_robot,
-        on_exit=[spawner('joint_state_broadcaster'), spawner('arm_controller'), spawner('gripper_controller')],
-    ))
+        target_action=spawn_robot, on_exit=[spawn_controllers]))
 
     executor = Node(package='satranc_robotu', executable='move_executor', output='screen',
-                    parameters=[sim_time, {'execute_human_moves': True}])
+                    parameters=[sim_time, {'execute_human_moves': True, 'style': LaunchConfiguration('style')}])
     engine = Node(package='satranc_robotu', executable='chess_engine', output='screen', parameters=[sim_time])
     # WSL'in Wayland ekranında RViz pencere açamıyor; X11 (xcb) ile açılır
     rviz = Node(package='rviz2', executable='rviz2', parameters=[sim_time],
+                condition=IfCondition(LaunchConfiguration('rviz')),
                 arguments=['-d', PathJoinSubstitution([pkg, 'rviz', 'satranc.rviz'])],
                 additional_env={'QT_QPA_PLATFORM': 'xcb'})
 
-    return LaunchDescription([gazebo, rsp, clock, spawn_robot, spawn_board, *spawn_pieces,
+    return LaunchDescription([DeclareLaunchArgument('rviz', default_value='false'), DeclareLaunchArgument('style', default_value='alu', choices=['alu', 'pink']), gazebo, rsp, clock, spawn_robot, spawn_board, *spawn_pieces,
                               controllers, executor, engine, rviz])
