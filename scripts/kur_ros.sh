@@ -29,7 +29,7 @@ sudo apt install -y ros-lyrical-desktop ros-dev-tools
 adim "5/7 Gazebo, ros2_control ve satranç paketleri"
 EKSIK=""
 for p in ros-lyrical-ros-gz ros-lyrical-gz-ros2-control ros-lyrical-ros2-control ros-lyrical-ros2-controllers \
-         ros-lyrical-xacro ros-lyrical-joint-state-publisher-gui stockfish python3-chess; do
+         ros-lyrical-xacro ros-lyrical-joint-state-publisher-gui stockfish python3-chess python3-aiohttp; do
   if sudo apt install -y "$p"; then echo "kuruldu: $p"; else EKSIK="$EKSIK $p"; fi
 done
 if echo "$EKSIK" | grep -q python3-chess; then

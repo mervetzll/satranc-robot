@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Windows'taki paket kopyasını Ubuntu'daki çalışma alanına aktarır ve yeniden derler (şifre gerekmez).
-set -e
+set -euo pipefail
 BURASI="$(cd "$(dirname "$0")" && pwd)"
 pkill -f "gz sim" 2>/dev/null || true
 pkill -f "ros2 launch satranc_robotu" 2>/dev/null || true
