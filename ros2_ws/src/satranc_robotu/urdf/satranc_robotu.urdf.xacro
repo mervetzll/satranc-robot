@@ -11,6 +11,11 @@
   <xacro:arg name="sim" default="gz"/>
   <xacro:property name="sim" value="$(arg sim)"/>
 
+  <xacro:arg name="style" default="alu"/>
+  <xacro:property name="pink" value="${'$(arg style)' == 'pink'}"/>
+  <xacro:property name="upper_w" value="${0.054 if pink else 0.051}"/>
+  <xacro:property name="upper_h" value="${0.050 if pink else 0.036}"/>
+  <xacro:property name="fore_r" value="0.023"/>
   <xacro:property name="PI" value="3.14159265"/>
   <xacro:property name="L1" value="0.10"/>
   <xacro:property name="L2" value="0.24"/>
@@ -18,11 +23,11 @@
   <xacro:property name="L4" value="0.14"/>
   <xacro:property name="base_r" value="0.085"/>
   <xacro:property name="base_h" value="0.014"/>
-  <xacro:property name="link_kg_m" value="0.31"/>   <!-- 2,5 g/cm kol + 0,6 g/cm kablo -->
+  <xacro:property name="link_kg_m" value="${0.66 if pink else 0.31}"/>   <!-- 2,5 g/cm kol + 0,6 g/cm kablo -->
   <xacro:property name="m_elbow_servo" value="0.060"/>  <!-- DS3218 -->
   <xacro:property name="m_wrist_servo" value="0.055"/>  <!-- MG996R -->
   <xacro:property name="m_roll_servo" value="0.0134"/>  <!-- MG90S -->
-  <xacro:property name="m_gripper" value="0.0484"/>     <!-- 35 g gövde + MG90S -->
+  <xacro:property name="m_gripper" value="${0.0734 if pink else 0.0484}"/>     <!-- 35 g gövde + MG90S -->
   <xacro:property name="wrist_len" value="0.042"/>      <!-- bilek ekseni → dönüş ekseni -->
   <xacro:property name="tcp" value="${L4 - wrist_len}"/> <!-- dönüş ekseni → parmak ucu -->
 
@@ -42,7 +47,7 @@
   </xacro:macro>
 
   <material name="govde"><color rgba="0.20 0.23 0.27 1"/></material>
-  <material name="aluminyum"><color rgba="0.80 0.83 0.86 1"/></material>
+  <material name="aluminyum"><color rgba="${'0.91 0.28 0.55 1' if pink else '0.80 0.83 0.86 1'}"/></material>
   <material name="servo"><color rgba="0.08 0.09 0.10 1"/></material>
   <material name="turuncu"><color rgba="0.85 0.40 0.10 1"/></material>
 
@@ -81,6 +86,10 @@
   </joint>
 
   <link name="turntable">
+    <xacro:if value="${pink}">
+      <visual><origin xyz="0 0 0.04"/><geometry><box size="0.058 0.062 0.060"/></geometry><material name="aluminyum"/></visual>
+      <collision><origin xyz="0 0 0.04"/><geometry><box size="0.058 0.062 0.060"/></geometry></collision>
+    </xacro:if>
     <visual>
       <origin xyz="0 0 0.005"/>
       <geometry><cylinder radius="0.072" length="0.01"/></geometry>
@@ -115,7 +124,7 @@
   <link name="upper_arm">
     <visual>
       <origin xyz="${L2/2} 0 0"/>
-      <geometry><box size="${L2} 0.051 0.036"/></geometry>
+      <geometry><box size="${L2} ${upper_w} ${upper_h}"/></geometry>
       <material name="aluminyum"/>
     </visual>
     <visual>
@@ -125,9 +134,9 @@
     </visual>
     <collision>
       <origin xyz="${L2/2} 0 0"/>
-      <geometry><box size="${L2} 0.051 0.036"/></geometry>
+      <geometry><box size="${L2} ${upper_w} ${upper_h}"/></geometry>
     </collision>
-    <xacro:box_inertial m="${link_kg_m*L2 + m_elbow_servo}" x="${L2}" y="0.05" z="0.036"
+    <xacro:box_inertial m="${link_kg_m*L2 + m_elbow_servo}" x="${L2}" y="${upper_w}" z="${upper_h}"
       ox="${(link_kg_m*L2*L2/2 + m_elbow_servo*L2)/(link_kg_m*L2 + m_elbow_servo)}"/>
   </link>
 
@@ -143,8 +152,11 @@
 
   <link name="forearm">
     <visual>
-      <origin xyz="${L3/2} 0 0"/>
-      <geometry><box size="${L3} 0.041 0.030"/></geometry>
+      <origin xyz="${L3/2} 0 0" rpy="0 ${PI/2 if pink else 0} 0"/>
+      <geometry>
+        <xacro:if value="${pink}"><cylinder radius="${fore_r}" length="${L3}"/></xacro:if>
+        <xacro:unless value="${pink}"><box size="${L3} 0.041 0.030"/></xacro:unless>
+      </geometry>
       <material name="aluminyum"/>
     </visual>
     <visual>
@@ -153,10 +165,13 @@
       <material name="servo"/>
     </visual>
     <collision>
-      <origin xyz="${L3/2} 0 0"/>
-      <geometry><box size="${L3} 0.041 0.030"/></geometry>
+      <origin xyz="${L3/2} 0 0" rpy="0 ${PI/2 if pink else 0} 0"/>
+      <geometry>
+        <xacro:if value="${pink}"><cylinder radius="${fore_r}" length="${L3}"/></xacro:if>
+        <xacro:unless value="${pink}"><box size="${L3} 0.041 0.030"/></xacro:unless>
+      </geometry>
     </collision>
-    <xacro:box_inertial m="${link_kg_m*L3 + m_wrist_servo}" x="${L3}" y="0.04" z="0.03"
+    <xacro:box_inertial m="${link_kg_m*L3 + m_wrist_servo}" x="${L3}" y="${2*fore_r if pink else 0.041}" z="${2*fore_r if pink else 0.030}"
       ox="${(link_kg_m*L3*L3/2 + m_wrist_servo*L3)/(link_kg_m*L3 + m_wrist_servo)}"/>
   </link>
 
