@@ -157,6 +157,7 @@ ul.rules { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4
 @media (max-width: 700px) { .sense-grid { grid-template-columns: minmax(0, 1fr); } }
 .sense-grid h3 { font-size: 13px; margin: 0 0 4px; }
 .sense-grid p { margin: 0; font-size: 12.5px; color: var(--muted); }
+button:disabled, input:disabled, select:disabled { opacity:0.5; cursor:not-allowed; }
 </style>
 
 </head>
@@ -292,6 +293,7 @@ def robot_hamlesi():
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (() => {
+let rosMode = false;
 let STYLE = 'alu'; // 'alu' = alüminyum plakalı kol, 'pink' = pembe endüstriyel kol
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1071,6 +1073,7 @@ function hover(loc) {
   chip.textContent = `${locLabel(loc)} · yatay ${sol.r.toFixed(1)} cm · ` + (sol.reach ? `omuz ${L.req[1].toFixed(1)} kg·cm · uç sapması ±${tipErr(sol).rss.toFixed(1)} mm` + (collide(sol) ? ' · çarpışma riski' : '') : `ulaşılamaz (gereken ${sol.D.toFixed(1)} cm, kol ${(P.L2 + P.L3).toFixed(1)} cm)`);
 }
 function clickLoc(loc) {
+  if (rosMode) return; // Live commands use the explicit UCI input.
   if (!loc || loc.kind !== 'sq' || anim.running) return;
   if (!state.sel) {
     if (!state.board[loc.key]) { setStatus(`${loc.key} karesinde taş yok`, 'err'); return; }
@@ -1120,6 +1123,7 @@ function moveTime(segs) { // servo hız katalog değerinin %70'i ile
 }
 // opts.bypass: gösterim (kural ve sıra denetimi yok), opts.engine: hamleyi robot rakip seçti
 function doMove(str, opts = {}) {
+  if (rosMode) { window.dispatchEvent(new CustomEvent('ros-move', { detail: str })); return true; }
   if (anim.running) { setStatus('Robot hâlâ hareket ediyor', 'err'); return false; }
   const m = /^\s*([a-h])([1-8])[\s\-x:]*([a-h])([1-8])\s*([qrbnQRBN])?\s*$/.exec(str || '');
   if (!m) { setStatus('Hamleyi e2e4 biçiminde yaz (terfi için e7e8q)', 'err'); return false; }
@@ -1606,6 +1610,7 @@ function recalc() {
 }
 const jc = $('#jointChips');
 function applyPose(full) {
+  if (rosMode) return;
   const sol = ik(state.tip.x, state.tip.y, state.tip.z);
   updateArm(sol);
   liveL = loads(sol, state.held ? P.pieceMass / 1000 : 0);
@@ -1661,6 +1666,59 @@ $('#btnCopy').addEventListener('click', e => {
 });
 window.addEventListener('resize', () => applyPose(true));
 
+// The live adapter never invokes the browser chess engine or motion animation.
+window.SatrancROS = {
+  status(text) { setStatus(text); },
+  enter() { rosMode = true; stopAnim(); demoActive = false; state.held = null; },
+  leave() { rosMode = false; initPieces(); resetGame(); state.tip = homeTip(); state.gap = 3; applyPose(true); },
+  configure(robot) {
+    stopAnim(); state.held = null;
+    STYLE = robot.style;
+    document.documentElement.dataset.style = STYLE;
+    $('#styleSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === STYLE));
+    const g = robot.geometry;
+    const map = {s:'s', base_gap:'baseGap', zone_gap:'zGap', L1:'L1', L2:'L2', L3:'L3', L4:'L4', clearance:'clear'};
+    for (const [k, v] of Object.entries(map)) setParam(v, g[k] * 100);
+    setParam('tilt', g.tilt_deg); setParam('graspFrac', g.grasp_frac * 100);
+    setParam('axes', 5); P.zl = '4x4';
+    setParam('linkMass', STYLE === 'pink' ? 6 : 2.5);
+    setParam('gripMass', STYLE === 'pink' ? 60 : 35);
+    buildArm(); buildBoard(); recalc();
+  },
+  board(robot) {
+    // FEN and trays are logical state confirmed by the executor, not measured piece poses.
+    state.pieces.forEach(p => { if(p.mesh) scene.remove(p.mesh); });
+    state.board = {}; state.zone = {w:Array(nSlots()).fill(null), b:Array(nSlots()).fill(null)};
+    state.pieces = []; state.held = null;
+    const add = (t, c, loc) => {
+      const p = {id:pid++, t, c, loc:null, mesh:null}; state.pieces.push(p); setLoc(p,loc); makePieceMesh(p);
+    };
+    robot.fen.split(' ')[0].split('/').forEach((rank, ri) => {
+      let file = 0;
+      for(const c of rank) {
+        if(/[1-8]/.test(c)) { file += Number(c); continue; }
+        add(c.toUpperCase(), c === c.toUpperCase() ? 'w':'b', {kind:'sq', key:FILES[file++] + (8-ri)});
+      }
+    });
+    for(const color of ['w','b']) (robot.zone[color] || []).forEach((t,idx) => {
+      if(t) add(t,color,{kind:'zone',side:color,idx});
+    });
+    game.turn = robot.fen.split(' ')[1];
+    $('#history').textContent = 'ROS mantıksal tahta durumu · taşların Gazebo içindeki kayması veya düşmesi bu görünümde ölçülmez.';
+    dirty = true;
+  },
+  joints(q) {
+    const th1=q.joint1, th2=q.joint2, ph3=th2+q.joint3, ph4=ph3+q.joint4;
+    const s=[90+th1*R2D,th2*R2D,-q.joint3*R2D,180+q.joint4*R2D,90+q.joint5*R2D];
+    const sol={th1,th2,ph3,ph4,psi:q.joint5,s,lim:s.map(x=>x<0||x>180),reach:true};
+    state.gap=(q.finger_left_joint+q.finger_right_joint)*100;
+    state.tip=toWorld(sol,fkPlane(sol).T);
+    updateArm(sol); liveL=loads(sol,P.pieceMass/1000); renderLive(); drawSide(sol,liveL);
+    jc.textContent=s.map((v,i)=>`J${i+1} ${v.toFixed(1)}°`).join(' · ')+' · ROS eklem verisi';
+    dirty=true;
+  }
+};
+
 // ---------- Başlat ----------
 HIST0 = $('#history').innerHTML;
 buildPanel(); buildTorqueTable(); bindCustomServo();
@@ -1684,5 +1742,6 @@ requestAnimationFrame(loop);
 setInterval(() => { const now = performance.now(); if (anim.running && now - last > 250) tick(now); }, 60);
 })();
 </script>
+<script src="ros-client.js"></script>
 </body>
 </html>
