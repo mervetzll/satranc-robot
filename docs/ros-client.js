@@ -92,6 +92,18 @@
     lock(false); window.SatrancROS.leave(); connect.disabled=false; leave.disabled=true; url.disabled=false;
     buttons(); message('Tasarım modu · ROS bağlantısı kapatıldı. Gazebo çalışmaya devam edebilir.');
   });
+  window.addEventListener('hashchange', () => {
+    const endpoint = new URLSearchParams(location.hash.slice(1)).get('endpoint');
+    if(!endpoint) return;
+    let target;
+    try { target=new URL(endpoint); if(target.protocol!=='wss:') return; } catch { return; }
+    if(target.href===url.value) return;
+    // A new presentation has its own endpoint and key. Never retain the old session.
+    if(ws) { ws.onclose=null; ws.close(); ws=null; }
+    packet=null; pending=false; lastAt=0; configuration=null; lastBoard=null;
+    $('rosKey').value=''; url.value=target.href; url.disabled=false; connect.disabled=false;
+    buttons(); message('Sunum adresi güncellendi · yeni oturumun anahtarıyla bağlanın');
+  });
   window.addEventListener('ros-move', event => {
     if(!fresh() || !packet?.can_move || pending) { message('ROS şu anda hamle kabul etmiyor'); return; }
     const uci=String(event.detail).replace(/[\s\-:x]/g,'').toLowerCase();
