@@ -1,0 +1,3 @@
+aiohttp==3.14.5
+chess==1.11.2
+xacro==2.1.1

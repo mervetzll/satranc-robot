@@ -1,3 +1,12 @@
+# Satranç robotu — ROS ve web geliştirme sürümü
+
+**29 Ekim 2026:** Bu klasör GitHub'daki sürümden türetilen yerel geliştirme kopyasıdır.
+Yeni ROS/web bağlantısı ve pembe model eklendi. Henüz canlı Gazebo ile uçtan uca denenmedi.
+Kurulum, testler ve sınırlamalar için önce [GELISTIRME.md](GELISTIRME.md) dosyasını okuyun.
+`docs/` içindeki eski PDF aşağıdaki yeni özelliklerin doğrulama raporu değildir.
+
+---
+
 # Satranç Robotu
 
 Satranç oynayan 5 eksenli servo kol: tasarım simülatörü, ROS 2 + Gazebo fizik simülasyonu ve

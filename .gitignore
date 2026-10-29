@@ -4,3 +4,16 @@ ros2_ws/install/
 ros2_ws/log/
 __pycache__/
 *.pyc
+
+# Yerel sunum oturumu ve kontrol anahtarları — yayımlanmaz
+.sunum/
+access.key
+*.key
+.env
+.env.*
+SUNUM_OZEL_NOTLAR.txt
+SUNUM_BAGLANTISI.txt
+SUNUM_BILGILERI.txt
+*_RAPORU.txt
+*.log
+test-logs/
